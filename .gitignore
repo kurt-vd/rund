@@ -1,0 +1,4 @@
+# hide build files
+
+*.o
+testlibt
