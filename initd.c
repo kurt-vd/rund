@@ -177,7 +177,6 @@ struct service {
 
 /* global list */
 static struct service *svcs;
-static int nsvc_to_remove;
 
 static void exec_svc(void *dat)
 {
@@ -261,10 +260,6 @@ static void cleanup_svc(struct service *svc)
 	struct service **psvc;
 	int j;
 
-	if (svc->flags & FL_REMOVE) {
-		--nsvc_to_remove;
-		/* alert ? */
-	}
 	/* remove from linked list */
 	for (psvc = &svcs; *psvc; psvc = &(*psvc)->next) {
 		if (*psvc == svc) {
@@ -320,8 +315,6 @@ static int cmd_remove(int argc, char *argv[])
 			continue;
 		if (svc->pid) {
 			kill(svc->pid, SIGTERM);
-			if (!(svc->flags & FL_REMOVE))
-				++nsvc_to_remove;
 			svc->flags |= FL_REMOVE;
 		} else {
 			libt_remove_timeout(exec_svc, svc);
