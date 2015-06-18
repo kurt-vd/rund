@@ -72,7 +72,7 @@ static int parse_nullbuff(char *buf, int len, char **pargv[])
 		if (!*str)
 			/* double null */
 			break;
-		if (j >= alloced) {
+		if ((j+1) >= alloced) {
 			/* make some room */
 			alloced += 16;
 			argv = realloc(argv, sizeof(*argv)*alloced);
@@ -82,6 +82,8 @@ static int parse_nullbuff(char *buf, int len, char **pargv[])
 		argv[j] = str;
 		str += strlen(str) + 1;
 	}
+	if (argv)
+		argv[j] = NULL;
 	*pargv = argv;
 	return j;
 }
