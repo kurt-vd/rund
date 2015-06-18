@@ -330,11 +330,10 @@ static int cmd_remove(int argc, char *argv[])
 
 static int cmd_removing(int argc, char *argv[])
 {
-	struct service *svc, *nsvc;
+	struct service *svc;
 	int ndone = 0;
 
-	for (svc = find_svc(svcs, argv); svc; svc = find_svc(nsvc, argv)) {
-		nsvc = svc->next ?: svc;
+	for (svc = find_svc(svcs, argv); svc; svc = find_svc(svc->next, argv)) {
 		if (peeruid && (svc->uid != peeruid))
 			continue;
 		if (svc->flags & FL_REMOVE)
