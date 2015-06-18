@@ -1,0 +1,10 @@
+# temporary files
+*.o
+
+# binaries
+initd
+initc
+
+# environment
+/tags
+/config.mk
