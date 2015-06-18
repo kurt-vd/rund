@@ -38,6 +38,9 @@ static const char *const rcpoweroffcmd[] = { "/etc/rc.shutdown", "poweroff", NUL
 /* globals */
 static int peeruid;
 static sigset_t savedset;
+#ifdef ANYPID
+static int mypid, myuid;
+#endif
 
 /* launch a process for init service */
 static int spawn(const char *const argv[])
@@ -193,6 +196,10 @@ static void exec_svc(void *dat)
 		setsid();
 		for (j = 0; j < svc->argv-svc->args; ++j)
 			putenv(svc->args[j]);
+#ifdef ANYPID
+		/* only try to set user when I'm root */
+		if (!myuid)
+#endif
 		if (svc->uid) {
 			/* change user */
 			struct passwd *pw;
@@ -218,6 +225,11 @@ static int cmd_add(int argc, char *argv[])
 	struct service *svc;
 	int j;
 
+#ifdef ANYPID
+	if (myuid && peeruid && (myuid != peeruid))
+		/* block on regular user mismatch */
+		return -EPERM;
+#endif
 	svc = malloc(sizeof(*svc));
 	if (!svc)
 		return -ENOMEM;
@@ -386,6 +398,10 @@ int main(int argc, char *argv[])
 	int nargs;
 	const struct cmd *cmd;
 
+#if ANYPID
+	mypid = getpid();
+	myuid = getuid();
+#endif
 	chdir("/");
 	/* setup signals */
 	sigfillset(&set);
@@ -413,9 +429,11 @@ int main(int argc, char *argv[])
 		elog(LOG_ERR, "setsockopt SO_PASSCRED failed: %s", ESTR(errno));
 
 	/* launch system start */
-	if (getpid() != 1)
+#ifdef ANYPID
+	if (mypid != 1)
 		rcinitpid = 0;
 	else
+#endif
 	rcinitpid = spawn(rcinitcmd);
 	while (1) {
 		libt_flush();
@@ -465,16 +483,22 @@ int main(int argc, char *argv[])
 				/* reboot */
 				if (rcinitpid)
 					kill(-rcinitpid, SIGTERM);
-				if (getpid() != 1)
+#ifdef ANYPID
+				if (mypid != 1)
 					exit(0);
+				else
+#endif
 				spawn(rcrebootcmd);
 				break;
 			case SIGTERM:
 				/* poweroff */
 				if (rcinitpid)
 					kill(-rcinitpid, SIGTERM);
-				if (getpid() != 1)
+#ifdef ANYPID
+				if (mypid != 1)
 					exit(0);
+				else
+#endif
 				spawn(rcpoweroffcmd);
 				break;
 			}
