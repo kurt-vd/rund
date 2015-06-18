@@ -281,10 +281,11 @@ static struct service *find_svc(struct service *svcs, char *args[])
 
 	if (!*args)
 		return NULL;
+	if (args[1] && !strcmp(args[1], "*"))
+		/* wildcard matches all */
+		return svcs;
 
 	for (svc = svcs; svc; svc = svc->next) {
-		if (args[1] && !strcmp(args[1], "*"))
-			return svc;
 		if (strcmp(args[1], *svc->argv))
 			continue;
 		for (j = 2; args[j]; ++j) {
