@@ -1,0 +1,3 @@
+[submodule "lib"]
+	path = lib
+	url = git://git.vandijck-laurijssen.be/libet.git
