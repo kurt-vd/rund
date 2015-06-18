@@ -240,7 +240,7 @@ static int cmd_add(int argc, char *argv[])
 	svc->args = malloc(sizeof(char *)*(argc-1+1));
 	for (j = 1; j < argc; ++j) {
 		svc->args[j-1] = strdup(argv[j]);
-		if (!svc->argv && !strchr(argv[j], '='))
+		if (!svc->argv && !strchr(argv[j-1], '='))
 			svc->argv = &svc->args[j-1];
 	}
 	svc->args[j-1] = NULL;
