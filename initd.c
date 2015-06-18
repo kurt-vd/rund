@@ -283,7 +283,7 @@ static struct service *find_svc(struct service *svcs, char *args[])
 		return NULL;
 
 	for (svc = svcs; svc; svc = svc->next) {
-		if (!strcmp(args[1], "*"))
+		if (args[1] && !strcmp(args[1], "*"))
 			return svc;
 		if (strcmp(args[1], *svc->argv))
 			continue;
