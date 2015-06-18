@@ -309,6 +309,9 @@ static int cmd_remove(int argc, char *argv[])
 	struct service *svc, *nsvc;
 	int ndone = 0;
 
+	if (!argv[1])
+		/* do not 'implicitely' remove all svcs */
+		return -EINVAL;
 	for (svc = find_svc(svcs, argv); svc; svc = find_svc(nsvc, argv)) {
 		nsvc = svc->next;
 		if (peeruid && (svc->uid != peeruid))
