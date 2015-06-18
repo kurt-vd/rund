@@ -286,21 +286,18 @@ static struct service *find_svc(struct service *svcs, char *args[])
 		return svcs;
 
 	for (svc = svcs; svc; svc = svc->next) {
-		if (strcmp(args[1], *svc->argv))
-			continue;
-		for (j = 2; args[j]; ++j) {
-			for (k = 1; svc->argv[k]; ++k) {
-				if (!strcmp(args[j], svc->argv[k]))
+		for (j = 1; args[j]; ++j) {
+			for (k = 0; svc->args[k]; ++k)
+				if (!strcmp(args[j], svc->args[k]))
 					break;
-			}
-			if (!svc->argv[k])
-				/* args[j] didn't match any svc->argv[k] */
-				break;
+			if (!svc->args[k])
+				goto nomatch;
 		}
-		if (args[j])
-			/* args[j] was not matched */
-			continue;
+		/* all 'needle's matched */
 		return svc;
+nomatch:
+		/* args[j] was not matched */
+		continue;
 	}
 	return NULL;
 }
