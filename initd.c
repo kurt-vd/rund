@@ -214,6 +214,8 @@ static void exec_svc(void *dat)
 				elog(LOG_CRIT, "setgid %i: %s", pw->pw_gid, ESTR(errno));
 			if (setuid(pw->pw_gid) < 0)
 				elog(LOG_CRIT, "setuid %i: %s", svc->uid, ESTR(errno));
+			setenv("HOME", pw->pw_dir, 1);
+			setenv("USER", pw->pw_name, 1);
 		}
 		execvp(*svc->argv, svc->argv);
 		elog(LOG_CRIT, "execvp: %s", ESTR(errno));
