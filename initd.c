@@ -37,9 +37,10 @@ static const char *const rcpoweroffcmd[] = { "/etc/rc.shutdown", "poweroff", NUL
 
 /* globals */
 static int peeruid;
+static int myuid;
 static sigset_t savedset;
 #ifdef ANYPID
-static int mypid, myuid;
+static int mypid;
 #endif
 
 /* launch a process for init service */
@@ -201,11 +202,8 @@ static void exec_svc(void *dat)
 		setsid();
 		for (j = 0; j < svc->argv-svc->args; ++j)
 			putenv(svc->args[j]);
-#ifdef ANYPID
 		/* only try to set user when I'm root */
-		if (!myuid)
-#endif
-		if (svc->uid) {
+		if (!myuid && svc->uid) {
 			/* change user */
 			struct passwd *pw;
 
@@ -232,11 +230,9 @@ static int cmd_add(int argc, char *argv[])
 	struct service *svc;
 	int j;
 
-#ifdef ANYPID
 	if (myuid && peeruid && (myuid != peeruid))
 		/* block on regular user mismatch */
 		return -EPERM;
-#endif
 	svc = malloc(sizeof(*svc));
 	if (!svc)
 		return -ENOMEM;
@@ -404,8 +400,8 @@ int main(int argc, char *argv[])
 
 #if ANYPID
 	mypid = getpid();
-	myuid = getuid();
 #endif
+	myuid = getuid();
 	chdir("/");
 	/* setup signals */
 	sigfillset(&set);
