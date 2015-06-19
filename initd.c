@@ -1,6 +1,7 @@
 /* See LICENSE file for copyright and license details. */
 #include <errno.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,13 +26,29 @@ static const char *const rcinitcmd[] = { "/etc/rc.init", NULL };
 static const char *const rcrebootcmd[] = { "/etc/rc.shutdown", "reboot", NULL };
 static const char *const rcpoweroffcmd[] = { "/etc/rc.shutdown", "poweroff", NULL };
 
-#define elog(level, fmt, ...) \
-	({\
-		/*syslog(level, fmt "\n", ##__VA_ARGS__);*/\
-		fprintf(stderr, "%s: " fmt "\n", NAME, ##__VA_ARGS__);\
-		if (level < LOG_ERR)\
-			exit(1);\
-	})
+/* logging */
+static int syslog_open;
+static int loglevel = LOG_WARNING;
+
+__attribute__((format(printf,2,3)))
+static void elog(int level, const char *fmt, ...)
+{
+	static char buf[1024];
+	va_list va;
+	int ret;
+
+	va_start(va, fmt);
+	ret = vsnprintf(buf, sizeof(buf)-1, fmt, va);
+	va_end(va);
+	if (ret < 0)
+		; /* nothing to print */
+	else if (syslog_open)
+		syslog(level, "%s", buf);
+	else if (level <= loglevel)
+		dprintf(STDERR_FILENO, "%s: %s\n", NAME, buf);
+	if (level < LOG_ERR)
+		exit(EXIT_FAILURE);
+}
 
 #define ESTR(x) strerror(x)
 
@@ -345,6 +362,35 @@ static int cmd_removing(int argc, char *argv[])
 	return ndone;
 }
 
+static int cmd_syslog(int argc, char *argv[])
+{
+	if (myuid != (peeruid ?: myuid))
+		return -EPERM;
+	if ((argc > 1) && !strcmp(argv[1], "close")) {
+		if (!syslog_open)
+			return -EEXIST;
+		closelog();
+		syslog_open = 0;
+	} else {
+		if (syslog_open)
+			return -EEXIST;
+		openlog("initd", LOG_PERROR, LOG_DAEMON);
+		syslog_open = 1;
+	}
+	return 0;
+}
+
+static int cmd_loglevel(int argc, char *argv[])
+{
+	if (myuid != (peeruid ?: myuid))
+		return -EPERM;
+	if (argc > 1) {
+		loglevel = strtoul(argv[1], NULL, 0);
+		setlogmask(LOG_UPTO(loglevel));
+	}
+	return loglevel;
+}
+
 /* remote commands */
 struct cmd {
 	const char *name;
@@ -355,6 +401,9 @@ struct cmd {
 	{ "add", cmd_add, },
 	{ "remove", cmd_remove, },
 	{ "removing", cmd_removing, },
+	/* management commands */
+	{ "syslog", cmd_syslog, },
+	{ "loglevel", cmd_loglevel, },
 	{ },
 };
 
