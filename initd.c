@@ -215,6 +215,14 @@ static void exec_svc(void *dat)
 		svc->pid = ret;
 	} else {
 		/* child */
+		/* redirect stdout & stderr to /dev/null
+		 * We know stdin is /dev/null.
+		 * stdout & stderr still default to /dev/console
+		 * and may have been redirected,
+		 */
+		dup2(STDIN_FILENO, STDOUT_FILENO);
+		dup2(STDIN_FILENO, STDERR_FILENO);
+
 		sigprocmask(SIG_SETMASK, &savedset, NULL);
 		setsid();
 		for (j = 0; j < svc->argv-svc->args; ++j)
@@ -391,6 +399,34 @@ static int cmd_loglevel(int argc, char *argv[])
 	return loglevel;
 }
 
+static int cmd_redir(int argc, char *argv[])
+{
+	int ret, fd;
+
+	if (myuid != (peeruid ?: myuid))
+		return -EPERM;
+
+	if (argc < 2)
+		return -EINVAL;
+	fd = open(argv[1], O_WRONLY | O_NOCTTY | O_APPEND | O_CREAT, 0666);
+	if (fd < 0) {
+		ret = errno;
+		elog(LOG_WARNING, "open %s: %s", argv[1], ESTR(errno));
+		return -ret;
+	}
+	ret = 0;
+	if (dup2(fd, STDOUT_FILENO) < 0) {
+		ret = errno; /* save errno for later return */
+		elog(LOG_WARNING, "dup2 %s stdout: %s", argv[1], ESTR(errno));
+	}
+	if (dup2(fd, STDERR_FILENO) < 0) {
+		ret = errno; /* save errno for later return */
+		elog(LOG_WARNING, "dup2 %s stdout: %s", argv[1], ESTR(errno));
+	}
+	close(fd);
+	return ret;
+}
+
 /* remote commands */
 struct cmd {
 	const char *name;
@@ -404,13 +440,14 @@ struct cmd {
 	/* management commands */
 	{ "syslog", cmd_syslog, },
 	{ "loglevel", cmd_loglevel, },
+	{ "redir", cmd_redir, },
 	{ },
 };
 
 /* main process */
 int main(int argc, char *argv[])
 {
-	int ret, sock;
+	int ret, sock, fd;
 	struct service *svc;
 	pid_t rcinitpid, pid;
 	struct pollfd fset[] = {
@@ -452,6 +489,13 @@ int main(int argc, char *argv[])
 #endif
 	myuid = getuid();
 	chdir("/");
+	fd = open("/dev/null", O_RDWR);
+	if (fd < 0)
+		elog(LOG_WARNING, "open %s: %s", "/dev/null", ESTR(errno));
+	else {
+		dup2(fd, STDIN_FILENO);
+		close(fd);
+	}
 	/* setup signals */
 	sigfillset(&set);
 	sigprocmask(SIG_BLOCK, &set, &savedset);
