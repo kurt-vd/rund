@@ -183,6 +183,10 @@ static void exec_svc(void *dat)
 	struct service *svc = dat;
 	int ret, j;
 
+	if (svc->delay[1])
+		/* this service has been throttled */
+		elog(LOG_INFO, "resume %s", *svc->argv);
+
 	ret = fork();
 	if (ret < 0) {
 		elog(LOG_ERR, "fork: %s", ESTR(errno));
@@ -252,6 +256,7 @@ static int cmd_add(int argc, char *argv[])
 	/* add in linked list */
 	svc->next = svcs;
 	svcs = svc;
+	elog(LOG_INFO, "start '%s'", *svc->argv);
 	/* exec now */
 	exec_svc(svc);
 	return svc->pid;
@@ -262,6 +267,7 @@ static void cleanup_svc(struct service *svc)
 	struct service **psvc;
 	int j;
 
+	elog(LOG_INFO, "remove '%s'", *svc->argv);
 	/* remove from linked list */
 	for (psvc = &svcs; *psvc; psvc = &(*psvc)->next) {
 		if (*psvc == svc) {
@@ -317,6 +323,7 @@ static int cmd_remove(int argc, char *argv[])
 		if (peeruid && (svc->uid != peeruid))
 			continue;
 		if (svc->pid) {
+			elog(LOG_INFO, "stop '%s'", *svc->argv);
 			kill(svc->pid, SIGTERM);
 			svc->flags |= FL_REMOVE;
 		} else {
@@ -466,11 +473,13 @@ int main(int argc, char *argv[])
 							svc->delay[0] =
 							svc->delay[1] = 0;
 							libt_add_timeout(0, exec_svc, svc);
+							elog(LOG_WARNING, "restart '%s", *svc->argv);
 						} else {
 							int delay = (svc->delay[0] + svc->delay[1]) ?: 1;
 							svc->delay[0] = svc->delay[1];
 							svc->delay[1] = delay;
 							libt_add_timeout(delay, exec_svc, svc);
+							elog(LOG_WARNING, "throttle '%s", *svc->argv);
 						}
 						break;
 					}
@@ -483,8 +492,8 @@ int main(int argc, char *argv[])
 #ifdef ANYPID
 				if (mypid != 1)
 					exit(0);
-				else
 #endif
+				elog(LOG_INFO, "reboot ...");
 				spawn(rcrebootcmd);
 				break;
 			case SIGTERM:
@@ -494,8 +503,8 @@ int main(int argc, char *argv[])
 #ifdef ANYPID
 				if (mypid != 1)
 					exit(0);
-				else
 #endif
+				elog(LOG_INFO, "poweroff ...");
 				spawn(rcpoweroffcmd);
 				break;
 			}
