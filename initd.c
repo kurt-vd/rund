@@ -32,7 +32,7 @@ static int syslog_open;
 static int loglevel = LOG_WARNING;
 
 __attribute__((format(printf,2,3)))
-static void elog(int level, const char *fmt, ...)
+static void mylog(int level, const char *fmt, ...)
 {
 	static char buf[1024];
 	va_list va;
@@ -68,13 +68,13 @@ static int spawn(const char *const argv[])
 
 	pid = fork();
 	if (pid < 0) {
-		elog(0, "fork: %s", ESTR(errno));
+		mylog(0, "fork: %s", ESTR(errno));
 		return -errno;
 	} else if (pid == 0) {
 		sigprocmask(SIG_SETMASK, &savedset, NULL);
 		setsid();
 		execvp(*argv, (char **)argv);
-		elog(LOG_CRIT, "execvp: %s", ESTR(errno));
+		mylog(LOG_CRIT, "execvp: %s", ESTR(errno));
 	}
 	return pid;
 }
@@ -130,18 +130,18 @@ static int cmd_watchdog(int argc, char *argv[])
 	struct wdt *wdt;
 
 	if (argc < 2) {
-		elog(LOG_WARNING, "no watchdog device given");
+		mylog(LOG_WARNING, "no watchdog device given");
 		return -EINVAL;
 	}
 	wdt = malloc(sizeof(*wdt)+strlen(argv[1]));
 	if (!wdt) {
-		elog(LOG_ERR, "malloc failed: %s", ESTR(errno));
+		mylog(LOG_ERR, "malloc failed: %s", ESTR(errno));
 		return -errno;
 	}
 	wdt->fd = open(argv[1], O_RDONLY);
 	if (wdt->fd < 0) {
 		free(wdt);
-		elog(LOG_ERR, "open %s: %s", argv[1], ESTR(errno));
+		mylog(LOG_ERR, "open %s: %s", argv[1], ESTR(errno));
 		return -errno;
 	}
 	wdt->timeout = (argc > 2) ? (strtoul(argv[2], 0, 0) ?: 1) : 1;
@@ -160,14 +160,14 @@ static int cmd_unwatchdog(int argc, char *argv[])
 	struct wdt **pwdt, *wdt;
 
 	if (argc < 2) {
-		elog(LOG_WARNING, "no watchdog device given");
+		mylog(LOG_WARNING, "no watchdog device given");
 		return -EINVAL;
 	}
 	for (pwdt = &wdts; *pwdt; pwdt = &(*pwdt)->next) {
 		if (!strcmp((*pwdt)->file, argv[1])) {
 			wdt = *pwdt;
 			if (peeruid && (wdt->owner != peeruid)) {
-				elog(LOG_ERR, "remove %s: %s", argv[1], ESTR(EPERM));
+				mylog(LOG_ERR, "remove %s: %s", argv[1], ESTR(EPERM));
 				return -EPERM;
 			}
 			/* remove from linked list */
@@ -204,11 +204,11 @@ static void exec_svc(void *dat)
 
 	if (svc->delay[1])
 		/* this service has been throttled */
-		elog(LOG_INFO, "resume %s", *svc->argv);
+		mylog(LOG_INFO, "resume %s", *svc->argv);
 
 	ret = fork();
 	if (ret < 0) {
-		elog(LOG_ERR, "fork: %s", ESTR(errno));
+		mylog(LOG_ERR, "fork: %s", ESTR(errno));
 		/* postpone for 1 second always, no incremental delay */
 		libt_add_timeout(1, exec_svc, svc);
 	} else if (ret > 0) {
@@ -235,18 +235,18 @@ static void exec_svc(void *dat)
 
 			pw = getpwuid(svc->uid);
 			if (!pw)
-				elog(LOG_CRIT, "unknown uid %i", svc->uid);
+				mylog(LOG_CRIT, "unknown uid %i", svc->uid);
 			if (initgroups(pw->pw_name, pw->pw_gid) < 0)
-				elog(LOG_CRIT, "initgroups for %s: %s", pw->pw_name, ESTR(errno));
+				mylog(LOG_CRIT, "initgroups for %s: %s", pw->pw_name, ESTR(errno));
 			if (setgid(pw->pw_gid) < 0)
-				elog(LOG_CRIT, "setgid %i: %s", pw->pw_gid, ESTR(errno));
+				mylog(LOG_CRIT, "setgid %i: %s", pw->pw_gid, ESTR(errno));
 			if (setuid(pw->pw_gid) < 0)
-				elog(LOG_CRIT, "setuid %i: %s", svc->uid, ESTR(errno));
+				mylog(LOG_CRIT, "setuid %i: %s", svc->uid, ESTR(errno));
 			setenv("HOME", pw->pw_dir, 1);
 			setenv("USER", pw->pw_name, 1);
 		}
 		execvp(*svc->argv, svc->argv);
-		elog(LOG_CRIT, "execvp: %s", ESTR(errno));
+		mylog(LOG_CRIT, "execvp: %s", ESTR(errno));
 		_exit(EXIT_FAILURE);
 	}
 }
@@ -278,7 +278,7 @@ static int cmd_add(int argc, char *argv[])
 	/* add in linked list */
 	svc->next = svcs;
 	svcs = svc;
-	elog(LOG_INFO, "start '%s'", *svc->argv);
+	mylog(LOG_INFO, "start '%s'", *svc->argv);
 	/* exec now */
 	exec_svc(svc);
 	return svc->pid;
@@ -289,7 +289,7 @@ static void cleanup_svc(struct service *svc)
 	struct service **psvc;
 	int j;
 
-	elog(LOG_INFO, "remove '%s'", *svc->argv);
+	mylog(LOG_INFO, "remove '%s'", *svc->argv);
 	/* remove from linked list */
 	for (psvc = &svcs; *psvc; psvc = &(*psvc)->next) {
 		if (*psvc == svc) {
@@ -345,7 +345,7 @@ static int cmd_remove(int argc, char *argv[])
 		if (peeruid && (svc->uid != peeruid))
 			continue;
 		if (svc->pid) {
-			elog(LOG_INFO, "stop '%s'", *svc->argv);
+			mylog(LOG_INFO, "stop '%s'", *svc->argv);
 			kill(svc->pid, SIGTERM);
 			svc->flags |= FL_REMOVE;
 		} else {
@@ -412,17 +412,17 @@ static int cmd_redir(int argc, char *argv[])
 	fd = open(argv[1], O_WRONLY | O_NOCTTY | O_APPEND | O_CREAT, 0666);
 	if (fd < 0) {
 		ret = errno;
-		elog(LOG_WARNING, "open %s: %s", argv[1], ESTR(errno));
+		mylog(LOG_WARNING, "open %s: %s", argv[1], ESTR(errno));
 		return -ret;
 	}
 	ret = 0;
 	if (dup2(fd, STDOUT_FILENO) < 0) {
 		ret = errno; /* save errno for later return */
-		elog(LOG_WARNING, "dup2 %s stdout: %s", argv[1], ESTR(errno));
+		mylog(LOG_WARNING, "dup2 %s stdout: %s", argv[1], ESTR(errno));
 	}
 	if (dup2(fd, STDERR_FILENO) < 0) {
 		ret = errno; /* save errno for later return */
-		elog(LOG_WARNING, "dup2 %s stdout: %s", argv[1], ESTR(errno));
+		mylog(LOG_WARNING, "dup2 %s stdout: %s", argv[1], ESTR(errno));
 	}
 	close(fd);
 	return ret;
@@ -492,7 +492,7 @@ int main(int argc, char *argv[])
 	chdir("/");
 	fd = open("/dev/null", O_RDWR);
 	if (fd < 0)
-		elog(LOG_WARNING, "open %s: %s", "/dev/null", ESTR(errno));
+		mylog(LOG_WARNING, "open %s: %s", "/dev/null", ESTR(errno));
 	else {
 		dup2(fd, STDIN_FILENO);
 		close(fd);
@@ -502,27 +502,27 @@ int main(int argc, char *argv[])
 	sigprocmask(SIG_BLOCK, &set, &savedset);
 	ret = fset[0].fd = signalfd(-1, &set, SFD_NONBLOCK | SFD_CLOEXEC);
 	if (ret < 0) {
-		elog(LOG_ERR, "signalfd failed: %s", ESTR(errno));
+		mylog(LOG_ERR, "signalfd failed: %s", ESTR(errno));
 		goto emergency;
 	}
 
 	/* open server socket */
 	fset[1].fd = sock = socket(PF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
 	if (sock < 0) {
-		elog(LOG_ERR, "socket(unix, ...) failed: %s", ESTR(errno));
+		mylog(LOG_ERR, "socket(unix, ...) failed: %s", ESTR(errno));
 		goto emergency;
 	}
 
 	ret = bind(sock, (void *)&name, sizeof(name));
 	if (ret < 0) {
-		elog(LOG_ERR, "bind(@%s) failed: %s", name.sun_path+1, ESTR(errno));
+		mylog(LOG_ERR, "bind(@%s) failed: %s", name.sun_path+1, ESTR(errno));
 		goto emergency;
 	}
 
 	ret = 1;
 	ret = setsockopt(sock, SOL_SOCKET, SO_PASSCRED, &ret, sizeof(ret));
 	if (ret < 0) {
-		elog(LOG_ERR, "setsockopt SO_PASSCRED failed: %s", ESTR(errno));
+		mylog(LOG_ERR, "setsockopt SO_PASSCRED failed: %s", ESTR(errno));
 		goto emergency;
 	}
 
@@ -538,7 +538,7 @@ int main(int argc, char *argv[])
 
 		ret = poll(fset, 2, libt_get_waittime());
 		if (ret < 0)
-			elog(LOG_CRIT, "poll: %s", ESTR(errno));
+			mylog(LOG_CRIT, "poll: %s", ESTR(errno));
 
 		if (fset[0].revents) {
 			/* signals */
@@ -546,7 +546,7 @@ int main(int argc, char *argv[])
 			ret = read(fset[0].fd, &info, sizeof(info));
 			if (ret < 0)
 				/* TODO: test for EAGAIN */
-				elog(LOG_CRIT, "read signalfd: %s", ESTR(errno));
+				mylog(LOG_CRIT, "read signalfd: %s", ESTR(errno));
 			switch (info.ssi_signo) {
 			case SIGCHLD:
 				/* reap lost children */
@@ -567,13 +567,13 @@ int main(int argc, char *argv[])
 							svc->delay[0] =
 							svc->delay[1] = 0;
 							libt_add_timeout(0, exec_svc, svc);
-							elog(LOG_WARNING, "restart '%s", *svc->argv);
+							mylog(LOG_WARNING, "restart '%s", *svc->argv);
 						} else {
 							int delay = (svc->delay[0] + svc->delay[1]) ?: 1;
 							svc->delay[0] = svc->delay[1];
 							svc->delay[1] = delay;
 							libt_add_timeout(delay, exec_svc, svc);
-							elog(LOG_WARNING, "throttle '%s", *svc->argv);
+							mylog(LOG_WARNING, "throttle '%s", *svc->argv);
 						}
 						break;
 					}
@@ -587,7 +587,7 @@ int main(int argc, char *argv[])
 				if (mypid != 1)
 					exit(0);
 #endif
-				elog(LOG_INFO, "reboot ...");
+				mylog(LOG_INFO, "reboot ...");
 				spawn(rcrebootcmd);
 				break;
 			case SIGTERM:
@@ -598,7 +598,7 @@ int main(int argc, char *argv[])
 				if (mypid != 1)
 					exit(0);
 #endif
-				elog(LOG_INFO, "poweroff ...");
+				mylog(LOG_INFO, "poweroff ...");
 				spawn(rcpoweroffcmd);
 				break;
 			}
@@ -614,7 +614,7 @@ int main(int argc, char *argv[])
 			ret = recvmsg(sock, &msg, 0);
 			if (ret < 0) {
 				if (errno != EAGAIN)
-					elog(LOG_WARNING, "recv ctrldat: %s", ESTR(errno));
+					mylog(LOG_WARNING, "recv ctrldat: %s", ESTR(errno));
 				goto sock_done;
 			}
 			cmsg = CMSG_FIRSTHDR(&msg);
@@ -630,7 +630,7 @@ int main(int argc, char *argv[])
 			/* process data */
 			nargs = parse_nullbuff(buf, ret, &args);
 			if (nargs < 1) {
-				elog(LOG_WARNING, "no command supplied!");
+				mylog(LOG_WARNING, "no command supplied!");
 				ret = -EINVAL;
 				goto sock_reply;
 			}
@@ -640,7 +640,7 @@ int main(int argc, char *argv[])
 				if (!strcmp(cmd->name, *args))
 					break;
 			if (!cmd->name) {
-				elog(LOG_WARNING, "command '%s' unknown", *args);
+				mylog(LOG_WARNING, "command '%s' unknown", *args);
 				ret = -ENOENT;
 				goto sock_reply;
 			}
@@ -653,7 +653,7 @@ sock_reply:
 			ret = snprintf(resp, sizeof(resp), "%i", ret);
 			ret = sendto(fset[1].fd, resp, ret, 0, (void *)&peername, msg.msg_namelen);
 			if (ret < 0)
-				elog(LOG_ERR, "sendto %c%s: %s", peername.sun_path[0] ?: '@',
+				mylog(LOG_ERR, "sendto %c%s: %s", peername.sun_path[0] ?: '@',
 						peername.sun_path+1, ESTR(errno));
 sock_done:
 			; /* empty statement */
@@ -663,9 +663,9 @@ sock_done:
 	return EXIT_SUCCESS;
 emergency:
 	execvp(*emergencycmd, (char **)emergencycmd);
-	elog(LOG_ERR, "execvp %s", *emergencycmd);
+	mylog(LOG_ERR, "execvp %s", *emergencycmd);
 	execlp("/bin/sh", "sh", NULL);
-	elog(LOG_ERR, "execvp /bin/sh");
+	mylog(LOG_ERR, "execvp /bin/sh");
 	return EXIT_FAILURE;
 
 }

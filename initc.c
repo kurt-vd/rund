@@ -13,7 +13,7 @@
 #define NAME "initc"
 
 #define LOG_ERR	1
-#define elog(level, fmt, ...) \
+#define mylog(level, fmt, ...) \
 	({\
 		fprintf(stderr, "%s: " fmt "\n", NAME, ##__VA_ARGS__);\
 		if (level <= LOG_ERR)\
@@ -24,7 +24,7 @@
 
 static void sigalrm(int sig)
 {
-	elog(LOG_ERR, "timeout communicating");
+	mylog(LOG_ERR, "timeout communicating");
 }
 
 static int sendcred(int sock, const void *dat, unsigned int len, int flags)
@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
 		bufp += strlen(bufp)+1;
 	}
 	if (bufp <= buf)
-		elog(LOG_ERR, "no command specified");
+		mylog(LOG_ERR, "no command specified");
 
 	/* schedule timeout */
 	signal(SIGALRM, sigalrm);
@@ -82,33 +82,33 @@ int main(int argc, char *argv[])
 	/* open client socket */
 	ret = sock = socket(PF_UNIX, SOCK_DGRAM, 0);
 	if (ret < 0)
-		elog(LOG_ERR, "socket(unix, ...) failed: %s", ESTR(errno));
+		mylog(LOG_ERR, "socket(unix, ...) failed: %s", ESTR(errno));
 	/* connect to server */
 	ret = connect(sock, (void *)&name, sizeof(name));
 	if (ret < 0)
-		elog(LOG_ERR, "connect(@%s) failed: %s", name.sun_path+1, ESTR(errno));
+		mylog(LOG_ERR, "connect(@%s) failed: %s", name.sun_path+1, ESTR(errno));
 
 	str = name.sun_path+1;
 	str += strlen(str);
 	sprintf(str, "-%i", getpid());
 	ret = bind(sock, (void *)&name, sizeof(name));
 	if (ret < 0)
-		elog(LOG_ERR, "connect(@%s) failed: %s", name.sun_path+1, ESTR(errno));
+		mylog(LOG_ERR, "connect(@%s) failed: %s", name.sun_path+1, ESTR(errno));
 
 	/* send command */
 	ret = sendcred(sock, buf, bufp - buf, 0);
 	if (ret < 0)
-		elog(LOG_ERR, "send ...: %s", ESTR(errno));
+		mylog(LOG_ERR, "send ...: %s", ESTR(errno));
 
 	ret = recv(sock, buf, sizeof(buf), 0);
 	if (ret < 0)
-		elog(LOG_ERR, "recv ...: %s", ESTR(errno));
+		mylog(LOG_ERR, "recv ...: %s", ESTR(errno));
 	if (!ret)
-		elog(LOG_ERR, "empty response");
+		mylog(LOG_ERR, "empty response");
 	buf[ret] = 0;
 	ret = strtol(buf, NULL, 0);
 	if (ret < 0)
-		elog(LOG_ERR, "command failed: %s", ESTR(-ret));
+		mylog(LOG_ERR, "command failed: %s", ESTR(-ret));
 	printf("%i\n", ret);
 	return EXIT_SUCCESS;
 }
