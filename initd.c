@@ -25,6 +25,7 @@
 static const char *const rcinitcmd[] = { "/etc/rc.init", NULL };
 static const char *const rcrebootcmd[] = { "/etc/rc.shutdown", "reboot", NULL };
 static const char *const rcpoweroffcmd[] = { "/etc/rc.shutdown", "poweroff", NULL };
+static const char *const emergencycmd[] = { "/sbin/sulogin", NULL, };
 
 /* logging */
 static int syslog_open;
@@ -500,26 +501,30 @@ int main(int argc, char *argv[])
 	sigfillset(&set);
 	sigprocmask(SIG_BLOCK, &set, &savedset);
 	ret = fset[0].fd = signalfd(-1, &set, SFD_NONBLOCK | SFD_CLOEXEC);
-	if (ret < 0)
-		/* TODO: start emergency shell */
+	if (ret < 0) {
 		elog(LOG_ERR, "signalfd failed: %s", ESTR(errno));
+		goto emergency;
+	}
 
 	/* open server socket */
 	fset[1].fd = sock = socket(PF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
-	if (sock < 0)
-		/* TODO: start emergency shell */
+	if (sock < 0) {
 		elog(LOG_ERR, "socket(unix, ...) failed: %s", ESTR(errno));
+		goto emergency;
+	}
 
 	ret = bind(sock, (void *)&name, sizeof(name));
-	if (ret < 0)
-		/* TODO: start emergency shell */
+	if (ret < 0) {
 		elog(LOG_ERR, "bind(@%s) failed: %s", name.sun_path+1, ESTR(errno));
+		goto emergency;
+	}
 
 	ret = 1;
 	ret = setsockopt(sock, SOL_SOCKET, SO_PASSCRED, &ret, sizeof(ret));
-	if (ret < 0)
-		/* TODO: start emergency shell */
+	if (ret < 0) {
 		elog(LOG_ERR, "setsockopt SO_PASSCRED failed: %s", ESTR(errno));
+		goto emergency;
+	}
 
 	/* launch system start */
 #ifdef ANYPID
@@ -656,4 +661,11 @@ sock_done:
 	}
 	/* not reachable */
 	return EXIT_SUCCESS;
+emergency:
+	execvp(*emergencycmd, (char **)emergencycmd);
+	elog(LOG_ERR, "execvp %s", *emergencycmd);
+	execlp("/bin/sh", "sh", NULL);
+	elog(LOG_ERR, "execvp /bin/sh");
+	return EXIT_FAILURE;
+
 }
