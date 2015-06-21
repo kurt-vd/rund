@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include <unistd.h>
+#include <getopt.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -22,11 +23,38 @@
 
 #define ESTR(x) strerror(x)
 
+/* program options */
+static const char help_msg[] =
+	NAME ": control utility for initd\n"
+	"usage:	" NAME " [OPTIONS ...] CMD [ARGS]\n"
+	"\n"
+	"Options:\n"
+	" -V	Show version\n"
+	"\n"
+	"Commands:\n"
+	" add [KEY=VALUE ...] PROGRAM [ARGUMENT ...]\n"
+	"	Add a new service\n"
+	" remove [KEY=VALUE ...] [PROGRAM] [ARGUMENT ...]\n"
+	"	Remove a service\n"
+	" remove *\n"
+	"	Remove all services\n"
+	" removing [KEY=VALUE ...] [PROGRAM] [ARGUMENT ...]\n"
+	"	Count the number of removed services that are yet exiting\n"
+	" syslog\n"
+	" loglevel\n"
+	" redir\n"
+	;
+static const char optstring[] = "+?V";
+
+/* comm timeout */
 static void sigalrm(int sig)
 {
 	mylog(LOG_ERR, "timeout communicating");
+	/* should have exited here */
+	exit(1);
 }
 
+/* convenience wrapper for send with SCM_CREDENTIALS */
 static int sendcred(int sock, const void *dat, unsigned int len, int flags)
 {
 	struct ucred *pcred;
@@ -58,7 +86,7 @@ static int sendcred(int sock, const void *dat, unsigned int len, int flags)
 /* main process */
 int main(int argc, char *argv[])
 {
-	int ret, sock, j;
+	int ret, opt, sock, j;
 	struct sockaddr_un name = {
 		.sun_family = AF_UNIX,
 		.sun_path = "\0initd",
@@ -68,7 +96,20 @@ int main(int argc, char *argv[])
 	static char buf[16*1024];
 	char *bufp = buf, *str;
 
-	for (j = 1; j < argc; ++j) {
+	/* parse program options */
+	while ((opt = getopt(argc, argv, optstring)) != -1)
+	switch (opt) {
+	case 'V':
+		fprintf(stderr, "%s: %s\n", NAME, VERSION);
+		return 0;
+	default:
+		fprintf(stderr, "%s: option '%c' unrecognised", NAME, opt);
+	case '?':
+		fputs(help_msg, stderr);
+		exit(1);
+	}
+
+	for (j = optind; j < argc; ++j) {
 		strcpy(bufp, argv[j]);
 		bufp += strlen(bufp)+1;
 	}
