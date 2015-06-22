@@ -20,7 +20,7 @@
 
 #include "lib/libt.h"
 
-#define NAME "initd"
+#define NAME "rund"
 
 static const char *const rcinitcmd[] = { "/etc/rc.init", NULL };
 static const char *const rcrebootcmd[] = { "/etc/rc.shutdown", "reboot", NULL };
@@ -383,7 +383,7 @@ static int cmd_syslog(int argc, char *argv[])
 	} else {
 		if (syslog_open)
 			return -EEXIST;
-		openlog("initd", LOG_PERROR, LOG_DAEMON);
+		openlog("rund", LOG_PERROR, LOG_DAEMON);
 		syslog_open = 1;
 	}
 	return 0;
@@ -458,7 +458,7 @@ int main(int argc, char *argv[])
 	sigset_t set;
 	struct sockaddr_un name = {
 		.sun_family = AF_UNIX,
-		.sun_path = "\0initd",
+		.sun_path = "\0rund",
 	};
 	/* for signalfd */
 	struct signalfd_siginfo info;

@@ -11,7 +11,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#define NAME "initc"
+#define NAME "runc"
 
 #define LOG_ERR	1
 #define mylog(level, fmt, ...) \
@@ -25,7 +25,7 @@
 
 /* program options */
 static const char help_msg[] =
-	NAME ": control utility for initd\n"
+	NAME ": control utility for rund\n"
 	"usage:	" NAME " [OPTIONS ...] CMD [ARGS]\n"
 	"\n"
 	"Options:\n"
@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
 	int ret, opt, sock, j;
 	struct sockaddr_un name = {
 		.sun_family = AF_UNIX,
-		.sun_path = "\0initd",
+		.sun_path = "\0rund",
 	};
 
 	/* prepare cmd */
