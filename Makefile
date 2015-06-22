@@ -1,4 +1,4 @@
-PROGS	= initd initc
+PROGS	= rund runc
 default	: $(PROGS)
 
 LOCALVERSION:= $(shell git describe --always --tags --dirty)
@@ -12,15 +12,13 @@ CPPFLAGS+= -DVERSION=\"$(LOCALVERSION)\"
 
 .PHONY: clean install
 
-initd: LDLIBS+= -lrt
-initd: lib/libt.o
+rund: LDLIBS+= -lrt
+rund: lib/libt.o
 
 clean:
 	rm -rf $(PROGS) $(wildcard *.o lib/*.o)
 
 install: $(PROGS)
-	@[ -d $(DESTDIR)$(PREFIX)/sbin ] || install -v -d $(DESTDIR)$(PREFIX)/sbin
-	@install -v initd $(DESTDIR)$(PREFIX)/sbin
 	@[ -d $(DESTDIR)$(PREFIX)/bin ] || install -v -d $(DESTDIR)$(PREFIX)/bin
-	@install -v initc $(DESTDIR)$(PREFIX)/bin
+	@install -v $^ $(DESTDIR)$(PREFIX)/bin
 

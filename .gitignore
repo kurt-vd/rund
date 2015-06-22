@@ -2,8 +2,8 @@
 *.o
 
 # binaries
-initd
-initc
+rund
+runc
 
 # environment
 /tags
