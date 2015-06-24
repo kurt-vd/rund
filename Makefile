@@ -1,4 +1,4 @@
-PROGS	= rund runc
+PROGS	= rund runc sockwait
 default	: $(PROGS)
 
 LOCALVERSION:= $(shell git describe --always --tags --dirty)
