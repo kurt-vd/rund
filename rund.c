@@ -71,6 +71,7 @@ static int spawn(const char *const argv[])
 		mylog(0, "fork: %s", ESTR(errno));
 		return -errno;
 	} else if (pid == 0) {
+		setenv("RUNDSOCK", "@rund", 1);
 		sigprocmask(SIG_SETMASK, &savedset, NULL);
 		setsid();
 		execvp(*argv, (char **)argv);
