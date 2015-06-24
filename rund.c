@@ -433,6 +433,17 @@ static int cmd_redir(int argc, char *argv[])
 	return ret;
 }
 
+static int cmd_env(int argc, char *argv[])
+{
+	if (myuid != (peeruid ?: myuid))
+		return -EPERM;
+
+	if (argc < 3)
+		return -EINVAL;
+	setenv(argv[1], argv[2], 1);
+	return 0;
+}
+
 /* remote commands */
 struct cmd {
 	const char *name;
@@ -447,6 +458,7 @@ struct cmd {
 	{ "syslog", cmd_syslog, },
 	{ "loglevel", cmd_loglevel, },
 	{ "redir", cmd_redir, },
+	{ "env", cmd_env, },
 	{ },
 };
 
