@@ -1,5 +1,6 @@
 /* See LICENSE file for copyright and license details. */
 #include <errno.h>
+#include <math.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +8,7 @@
 
 #include <unistd.h>
 #include <getopt.h>
+#include <poll.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -30,6 +32,8 @@ static const char help_msg[] =
 	"\n"
 	"Options:\n"
 	" -V	Show version\n"
+	" -r[DELAY]	Repeat command each DELAY secs (default 1.0)\n"
+	"		until 0 is returned\n"
 	"\n"
 	"Commands:\n"
 	" add [KEY=VALUE ...] PROGRAM [ARGUMENT ...]\n"
@@ -44,7 +48,7 @@ static const char help_msg[] =
 	" loglevel\n"
 	" redir\n"
 	;
-static const char optstring[] = "+?V";
+static const char optstring[] = "+?Vr::";
 
 /* comm timeout */
 static void sigalrm(int sig)
@@ -91,6 +95,7 @@ int main(int argc, char *argv[])
 		.sun_family = AF_UNIX,
 		.sun_path = "\0rund",
 	};
+	double repeat = NAN;
 
 	/* prepare cmd */
 	static char sbuf[16*1024], rbuf[1024];
@@ -102,6 +107,11 @@ int main(int argc, char *argv[])
 	case 'V':
 		fprintf(stderr, "%s: %s\n", NAME, VERSION);
 		return 0;
+	case 'r':
+		repeat = optarg ? strtod(optarg, NULL) : 1;
+		if (!(repeat > 0))
+			mylog(LOG_ERR, "bad rate '%s'", optarg);
+		break;
 	default:
 		fprintf(stderr, "%s: option '%c' unrecognised", NAME, opt);
 	case '?':
@@ -116,9 +126,8 @@ int main(int argc, char *argv[])
 	if (bufp <= sbuf)
 		mylog(LOG_ERR, "no command specified");
 
-	/* schedule timeout */
+	/* install timeout handler using sigalrm */
 	signal(SIGALRM, sigalrm);
-	alarm(1);
 
 	/* open client socket */
 	ret = sock = socket(PF_UNIX, SOCK_DGRAM, 0);
@@ -136,20 +145,31 @@ int main(int argc, char *argv[])
 	if (ret < 0)
 		mylog(LOG_ERR, "connect(@%s) failed: %s", name.sun_path+1, ESTR(errno));
 
-	/* send command */
-	ret = sendcred(sock, sbuf, bufp - sbuf, 0);
-	if (ret < 0)
-		mylog(LOG_ERR, "send ...: %s", ESTR(errno));
+	do {
+		/* schedule timeout */
+		alarm(1);
+		/* send command */
+		ret = sendcred(sock, sbuf, bufp - sbuf, 0);
+		if (ret < 0)
+			mylog(LOG_ERR, "send ...: %s", ESTR(errno));
 
-	ret = recv(sock, rbuf, sizeof(rbuf)-1, 0);
-	if (ret < 0)
-		mylog(LOG_ERR, "recv ...: %s", ESTR(errno));
-	if (!ret)
-		mylog(LOG_ERR, "empty response");
-	rbuf[ret] = 0;
-	ret = strtol(rbuf, NULL, 0);
-	if (ret < 0)
-		mylog(LOG_ERR, "command failed: %s", ESTR(-ret));
-	printf("%i\n", ret);
+		ret = recv(sock, rbuf, sizeof(rbuf)-1, 0);
+		if (ret < 0)
+			mylog(LOG_ERR, "recv ...: %s", ESTR(errno));
+		if (!ret)
+			mylog(LOG_ERR, "empty response");
+		rbuf[ret] = 0;
+		ret = strtol(rbuf, NULL, 0);
+		if (ret < 0)
+			mylog(LOG_ERR, "command failed: %s", ESTR(-ret));
+		if (isnan(repeat)) {
+			printf("%i\n", ret);
+			break;
+		}
+		/* remove timeout */
+		alarm(0);
+		if (ret)
+			poll(NULL, 0, repeat*1000);
+	} while (ret);
 	return EXIT_SUCCESS;
 }
