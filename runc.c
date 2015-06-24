@@ -32,6 +32,7 @@ static const char help_msg[] =
 	"\n"
 	"Options:\n"
 	" -V	Show version\n"
+	" -q	Quiet, don't print replies\n"
 	" -r[DELAY]	Repeat command each DELAY secs (default 1.0)\n"
 	"		until 0 is returned\n"
 	"\n"
@@ -48,7 +49,7 @@ static const char help_msg[] =
 	" loglevel\n"
 	" redir\n"
 	;
-static const char optstring[] = "+?Vr::";
+static const char optstring[] = "+?Vqr::";
 
 /* comm timeout */
 static void sigalrm(int sig)
@@ -96,6 +97,7 @@ int main(int argc, char *argv[])
 		.sun_path = "\0rund",
 	};
 	double repeat = NAN;
+	int quiet = 0;
 
 	/* prepare cmd */
 	static char sbuf[16*1024], rbuf[1024];
@@ -107,6 +109,9 @@ int main(int argc, char *argv[])
 	case 'V':
 		fprintf(stderr, "%s: %s\n", NAME, VERSION);
 		return 0;
+	case 'q':
+		quiet = 1;
+		break;
 	case 'r':
 		repeat = optarg ? strtod(optarg, NULL) : 1;
 		if (!(repeat > 0))
@@ -163,7 +168,8 @@ int main(int argc, char *argv[])
 		if (ret < 0)
 			mylog(LOG_ERR, "command failed: %s", ESTR(-ret));
 		if (isnan(repeat)) {
-			printf("%i\n", ret);
+			if (!quiet)
+				printf("%i\n", ret);
 			break;
 		}
 		/* remove timeout */
