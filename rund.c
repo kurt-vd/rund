@@ -337,14 +337,18 @@ static int cmd_remove(int argc, char *argv[])
 {
 	struct service *svc, *nsvc;
 	int ndone = 0;
+	int err = -ENOENT;
 
 	if (!argv[1])
 		/* do not 'implicitely' remove all svcs */
 		return -EINVAL;
 	for (svc = find_svc(svcs, argv); svc; svc = find_svc(nsvc, argv)) {
 		nsvc = svc->next;
-		if (peeruid && (svc->uid != peeruid))
+		if (peeruid && (svc->uid != peeruid)) {
+			/* change returned error into 'permission ...' */
+			err = EPERM;
 			continue;
+		}
 		if (svc->pid) {
 			mylog(LOG_INFO, "stop '%s'", *svc->argv);
 			kill(svc->pid, SIGTERM);
@@ -355,7 +359,7 @@ static int cmd_remove(int argc, char *argv[])
 		}
 		++ndone;
 	}
-	return ndone ?: -ENOENT;
+	return ndone ?: err;
 }
 
 static int cmd_removing(int argc, char *argv[])
