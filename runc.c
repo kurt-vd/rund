@@ -113,7 +113,7 @@ int main(int argc, char *argv[])
 			mylog(LOG_ERR, "bad rate '%s'", optarg);
 		break;
 	default:
-		fprintf(stderr, "%s: option '%c' unrecognised", NAME, opt);
+		fprintf(stderr, "%s: option '%c' unrecognised\n", NAME, opt);
 	case '?':
 		fputs(help_msg, stderr);
 		exit(1);
