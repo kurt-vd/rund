@@ -93,8 +93,8 @@ int main(int argc, char *argv[])
 	};
 
 	/* prepare cmd */
-	static char buf[16*1024];
-	char *bufp = buf, *str;
+	static char sbuf[16*1024], rbuf[1024];
+	char *bufp, *str;
 
 	/* parse program options */
 	while ((opt = getopt(argc, argv, optstring)) != -1)
@@ -109,11 +109,11 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	for (j = optind; j < argc; ++j) {
+	for (j = optind, bufp = sbuf; j < argc; ++j) {
 		strcpy(bufp, argv[j]);
 		bufp += strlen(bufp)+1;
 	}
-	if (bufp <= buf)
+	if (bufp <= sbuf)
 		mylog(LOG_ERR, "no command specified");
 
 	/* schedule timeout */
@@ -137,17 +137,17 @@ int main(int argc, char *argv[])
 		mylog(LOG_ERR, "connect(@%s) failed: %s", name.sun_path+1, ESTR(errno));
 
 	/* send command */
-	ret = sendcred(sock, buf, bufp - buf, 0);
+	ret = sendcred(sock, sbuf, bufp - sbuf, 0);
 	if (ret < 0)
 		mylog(LOG_ERR, "send ...: %s", ESTR(errno));
 
-	ret = recv(sock, buf, sizeof(buf), 0);
+	ret = recv(sock, rbuf, sizeof(rbuf)-1, 0);
 	if (ret < 0)
 		mylog(LOG_ERR, "recv ...: %s", ESTR(errno));
 	if (!ret)
 		mylog(LOG_ERR, "empty response");
-	buf[ret] = 0;
-	ret = strtol(buf, NULL, 0);
+	rbuf[ret] = 0;
+	ret = strtol(rbuf, NULL, 0);
 	if (ret < 0)
 		mylog(LOG_ERR, "command failed: %s", ESTR(-ret));
 	printf("%i\n", ret);
