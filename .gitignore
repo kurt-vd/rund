@@ -5,6 +5,7 @@
 rund
 runc
 sockwait
+ktstamp
 
 # environment
 /tags

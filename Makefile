@@ -1,4 +1,4 @@
-PROGS	= rund runc sockwait
+PROGS	= rund runc sockwait ktstamp
 default	: $(PROGS)
 
 LOCALVERSION:= $(shell git describe --always --tags --dirty)
