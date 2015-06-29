@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <unistd.h>
 #include <getopt.h>
@@ -16,6 +17,7 @@
 #define NAME "runc"
 
 #define LOG_ERR	1
+#define LOG_INFO 3
 #define mylog(level, fmt, ...) \
 	({\
 		fprintf(stderr, "%s: " fmt "\n", NAME, ##__VA_ARGS__);\
@@ -35,6 +37,7 @@ static const char help_msg[] =
 	" -q	Quiet, don't print replies\n"
 	" -r[DELAY]	Repeat command each DELAY secs (default 1.0)\n"
 	"		until 0 is returned\n"
+	" -mDELAY	Repeat Maxixum during DELAY secs\n"
 	"\n"
 	"Commands:\n"
 	" add [KEY=VALUE ...] PROGRAM [ARGUMENT ...]\n"
@@ -49,7 +52,7 @@ static const char help_msg[] =
 	" loglevel\n"
 	" redir\n"
 	;
-static const char optstring[] = "+?Vqr::";
+static const char optstring[] = "+?Vqr::m:";
 
 /* comm timeout */
 static void sigalrm(int sig)
@@ -97,6 +100,8 @@ int main(int argc, char *argv[])
 		.sun_path = "\0rund",
 	};
 	double repeat = NAN;
+	int maxdelay = 0;
+	time_t t0;
 	int quiet = 0;
 
 	/* prepare cmd */
@@ -116,6 +121,9 @@ int main(int argc, char *argv[])
 		repeat = optarg ? strtod(optarg, NULL) : 1;
 		if (!(repeat > 0))
 			mylog(LOG_ERR, "bad rate '%s'", optarg);
+		break;
+	case 'm':
+		maxdelay = ceil(strtod(optarg, NULL));
 		break;
 	default:
 		fprintf(stderr, "%s: option '%c' unrecognised\n", NAME, opt);
@@ -150,6 +158,7 @@ int main(int argc, char *argv[])
 	if (ret < 0)
 		mylog(LOG_ERR, "connect(@%s) failed: %s", name.sun_path+1, ESTR(errno));
 
+	t0 = time(NULL);
 	do {
 		/* schedule timeout */
 		alarm(1);
@@ -171,6 +180,13 @@ int main(int argc, char *argv[])
 			if (!quiet)
 				printf("%i\n", ret);
 			break;
+		}
+		if (maxdelay && (!ret || (time(NULL) > (t0+maxdelay)))) {
+			if (!quiet)
+				mylog(LOG_INFO, "%s %s after %lu seconds", sbuf,
+					ret ? "aborted" : "finished",
+					time(NULL)-t0);
+			return !!ret;
 		}
 		/* remove timeout */
 		alarm(0);
