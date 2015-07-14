@@ -38,6 +38,7 @@ static const char help_msg[] =
 	" -r[DELAY]	Repeat command each DELAY secs (default 1.0)\n"
 	"		until 0 is returned\n"
 	" -mDELAY	Repeat Maxixum during DELAY secs\n"
+	" -sSOCK	Use alternative socket SOCK\n"
 	"\n"
 	"Commands:\n"
 	" add [KEY=VALUE ...] PROGRAM [ARGUMENT ...]\n"
@@ -52,7 +53,7 @@ static const char help_msg[] =
 	" loglevel\n"
 	" redir\n"
 	;
-static const char optstring[] = "+?Vqr::m:";
+static const char optstring[] = "+?Vqr::m:s:";
 
 /* comm timeout */
 static void sigalrm(int sig)
@@ -121,6 +122,11 @@ int main(int argc, char *argv[])
 		repeat = optarg ? strtod(optarg, NULL) : 1;
 		if (!(repeat > 0))
 			mylog(LOG_ERR, "bad rate '%s'", optarg);
+		break;
+	case 's':
+		if (*optarg != '@')
+			mylog(LOG_ERR, "bad socket name '%s'", optarg);
+		strcpy(name.sun_path+1, optarg+1);
 		break;
 	case 'm':
 		maxdelay = ceil(strtod(optarg, NULL));

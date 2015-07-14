@@ -27,6 +27,12 @@ static const char *const rcrebootcmd[] = { "/etc/rc.shutdown", "reboot", NULL };
 static const char *const rcpoweroffcmd[] = { "/etc/rc.shutdown", "poweroff", NULL };
 static const char *const emergencycmd[] = { "/sbin/sulogin", NULL, };
 
+#ifdef ANYPID
+static const char *rundsock = "@rund";
+#else
+#define rundsock "@rund"
+#endif
+
 /* logging */
 static int syslog_open;
 static int loglevel = LOG_WARNING;
@@ -71,7 +77,7 @@ static int spawn(const char *const argv[])
 		mylog(0, "fork: %s", ESTR(errno));
 		return -errno;
 	} else if (pid == 0) {
-		setenv("RUNDSOCK", "@rund", 1);
+		setenv("RUNDSOCK", rundsock, 1);
 		sigprocmask(SIG_SETMASK, &savedset, NULL);
 		setsid();
 		execvp(*argv, (char **)argv);
@@ -504,6 +510,8 @@ int main(int argc, char *argv[])
 
 #if ANYPID
 	mypid = getpid();
+	rundsock = getenv("RUNDSOCK") ?: rundsock;
+	strcpy(name.sun_path+1, rundsock+1);
 #endif
 	myuid = getuid();
 	chdir("/");
