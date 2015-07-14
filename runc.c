@@ -103,12 +103,14 @@ int main(int argc, char *argv[])
 	double repeat = NAN;
 	int maxdelay = 0;
 	time_t t0;
-	int quiet = 0;
+	int quiet;
 
 	/* prepare cmd */
 	static char sbuf[16*1024], rbuf[1024];
 	char *bufp, *str;
 
+	/* assume quiet operation on non-terminal invocation */
+	quiet = isatty(STDERR_FILENO) < 0;
 	/* parse program options */
 	while ((opt = getopt(argc, argv, optstring)) != -1)
 	switch (opt) {
