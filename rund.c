@@ -627,6 +627,17 @@ int main(int argc, char *argv[])
 				mylog(LOG_INFO, "poweroff ...");
 				spawn(rcpoweroffcmd);
 				break;
+			case SIGHUP:
+				/* retry throttled services */
+				mylog(LOG_INFO, "reload ...");
+				for (svc = svcs; svc; svc = svc->next) {
+					if (!svc->pid && svc->delay[1]) {
+						/* re-schedule immediate */
+						libt_remove_timeout(exec_svc, svc);
+						libt_add_timeout(0, exec_svc, svc);
+					}
+				}
+				break;
 			}
 		}
 		if (fset[1].revents) {
