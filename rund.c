@@ -272,13 +272,14 @@ static int cmd_add(int argc, char *argv[])
 	memset(svc, 0, sizeof(*svc));
 	svc->uid = peeruid;
 	/* copy args */
-	svc->args = malloc(sizeof(char *)*(argc-1+1));
-	for (j = 1; j < argc; ++j) {
-		svc->args[j-1] = strdup(argv[j]);
-		if (!svc->argv && !strchr(argv[j-1], '='))
-			svc->argv = &svc->args[j-1];
+	--argc; ++argv;
+	svc->args = malloc(sizeof(char *)*(argc+1));
+	for (j = 0; j < argc; ++j) {
+		svc->args[j] = strdup(argv[j]);
+		if (!svc->argv && !strchr(svc->args[j], '='))
+			svc->argv = svc->args+j;
 	}
-	svc->args[j-1] = NULL;
+	svc->args[j] = NULL;
 	if (!svc->argv)
 		svc->argv = svc->args;
 
