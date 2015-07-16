@@ -255,7 +255,7 @@ static void exec_svc(void *dat)
 			setenv("USER", pw->pw_name, 1);
 		}
 		execvp(*svc->argv, svc->argv);
-		mylog(LOG_CRIT, "execvp: %s", ESTR(errno));
+		mylog(LOG_CRIT, "execvp %s: %s", *svc->argv, ESTR(errno));
 		_exit(EXIT_FAILURE);
 	}
 }
