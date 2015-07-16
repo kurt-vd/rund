@@ -545,6 +545,11 @@ int main(int argc, char *argv[])
 	mypid = getpid();
 	rundsock = getenv("RUNDSOCK") ?: rundsock;
 	strcpy(name.sun_path+1, rundsock+1);
+#else
+	if ((getpid() != 1) || (getppid() != 1)) {
+		printf("%s %s\n", NAME, VERSION);
+		return 0;
+	}
 #endif
 	myuid = getuid();
 	chdir("/");
