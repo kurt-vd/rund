@@ -281,6 +281,24 @@ static int cmd_add(int argc, char *argv[])
 		goto failed;
 	}
 	for (j = 0; j < argc; ++j) {
+		if (!svc->argv && !strncmp("USER=", argv[j], 5)) {
+			/* still in environment, and user provided */
+			struct passwd *pw;
+
+			pw = getpwnam(argv[j]+5);
+			if (!pw) {
+				result = -EINVAL;
+				mylog(LOG_WARNING, "user '%s' unknown", argv[j]+5);
+				goto failed;
+			}
+			if (peeruid && (pw->pw_uid != peeruid)) {
+				result = -EPERM;
+				mylog(LOG_WARNING, "only root may change user");
+				goto failed;
+			}
+			svc->uid = pw->pw_uid;
+			continue;
+		}
 		svc->args[j] = strdup(argv[j]);
 		if (!svc->argv && !strchr(svc->args[j], '='))
 			svc->argv = svc->args+j;
