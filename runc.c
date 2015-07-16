@@ -95,7 +95,7 @@ static int sendcred(int sock, const void *dat, unsigned int len, int flags)
 /* main process */
 int main(int argc, char *argv[])
 {
-	int ret, opt, sock, j;
+	int ret, opt, sock, j, pos;
 	struct sockaddr_un name = {
 		.sun_family = AF_UNIX,
 		.sun_path = "\0rund",
@@ -106,7 +106,7 @@ int main(int argc, char *argv[])
 	int quiet;
 
 	/* prepare cmd */
-	static char sbuf[16*1024], rbuf[1024];
+	static char sbuf[16*1024], rbuf[16*1024];
 	char *bufp, *str;
 
 	/* assume quiet operation on non-terminal invocation */
@@ -175,12 +175,24 @@ int main(int argc, char *argv[])
 		if (ret < 0)
 			mylog(LOG_ERR, "send ...: %s", ESTR(errno));
 
-		ret = recv(sock, rbuf, sizeof(rbuf)-1, 0);
-		if (ret < 0)
-			mylog(LOG_ERR, "recv ...: %s", ESTR(errno));
-		if (!ret)
-			mylog(LOG_ERR, "empty response");
-		rbuf[ret] = 0;
+		do {
+			ret = recv(sock, rbuf, sizeof(rbuf)-1, 0);
+			if (ret < 0)
+				mylog(LOG_ERR, "recv ...: %s", ESTR(errno));
+			if (!ret)
+				mylog(LOG_ERR, "empty response");
+			rbuf[ret] = 0;
+			if (*rbuf != '>')
+				break;
+			for (pos = 1; pos < ret; ) {
+				if (pos > 1)
+					fputc(' ', stdout);
+				fputs(rbuf+pos, stdout);
+				pos += strlen(rbuf+pos)+1;
+			}
+			printf("\n");
+			alarm(1);
+		} while (1);
 		ret = strtol(rbuf, NULL, 0);
 		if (ret < 0)
 			mylog(LOG_ERR, "command failed: %s", ESTR(-ret));

@@ -486,6 +486,37 @@ static int cmd_env(int argc, char *argv[])
 	return 0;
 }
 
+static char sbuf[16*1024];
+static int cmd_status(int argc, char *argv[])
+{
+	struct service *svc;
+	int ndone = 0, err = 0, j, ret;
+	char *bufp;
+
+	for (svc = find_svc(svcs, argv); svc; svc = find_svc(svc->next, argv)) {
+		if (peeruid && (svc->uid != peeruid)) {
+			/* change returned error into 'permission ...' */
+			err = EPERM;
+			continue;
+		}
+		bufp = sbuf;
+		*bufp++ = '>';
+		if (svc->pid)
+			bufp += sprintf(bufp, ".pid=%u", svc->pid) +1;
+		if (svc->uid)
+			bufp += sprintf(bufp, ".uid=%u", svc->uid) +1;
+		for (j = 0; svc->args[j]; ++j) {
+			strcpy(bufp, svc->args[j]);
+			bufp += strlen(bufp)+1;
+		}
+		ret = sendto(sock, sbuf, bufp-sbuf, 0, (void *)&peername, peernamelen);
+		if (ret < 0)
+			return -errno;
+		++ndone;
+	}
+	return ndone ?: -err;
+}
+
 /* remote commands */
 struct cmd {
 	const char *name;
