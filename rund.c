@@ -60,6 +60,9 @@ static void mylog(int level, const char *fmt, ...)
 #define ESTR(x) strerror(x)
 
 /* globals */
+static int sock;
+static struct sockaddr_un peername;
+static int peernamelen;
 static int peeruid;
 static int myuid;
 static sigset_t savedset;
@@ -498,13 +501,14 @@ struct cmd {
 	{ "loglevel", cmd_loglevel, },
 	{ "redir", cmd_redir, },
 	{ "env", cmd_env, },
+	{ "status", cmd_status, },
 	{ },
 };
 
 /* main process */
 int main(int argc, char *argv[])
 {
-	int ret, sock, fd;
+	int ret, fd;
 	struct service *svc;
 	pid_t rcinitpid, pid;
 	struct pollfd fset[] = {
@@ -521,7 +525,6 @@ int main(int argc, char *argv[])
 	/* for recvmsg */
 	static char buf[16*1024];
 	static char resp[128];
-	struct sockaddr_un peername;
 	static char cmsgdat[CMSG_SPACE(sizeof(struct ucred))];
 	struct iovec iov = {
 		.iov_base = buf,
@@ -719,13 +722,14 @@ int main(int argc, char *argv[])
 				goto sock_reply;
 			}
 			/* run command */
+			peernamelen = msg.msg_namelen;
 			ret = cmd->fn(nargs, args);
 sock_reply:
 			if (!msg.msg_namelen)
 				/* anonymous socket, skip reply */
 				goto sock_done;
 			ret = snprintf(resp, sizeof(resp), "%i", ret);
-			ret = sendto(fset[1].fd, resp, ret, 0, (void *)&peername, msg.msg_namelen);
+			ret = sendto(sock, resp, ret, 0, (void *)&peername, msg.msg_namelen);
 			if (ret < 0)
 				mylog(LOG_ERR, "sendto %c%s: %s", peername.sun_path[0] ?: '@',
 						peername.sun_path+1, ESTR(errno));
