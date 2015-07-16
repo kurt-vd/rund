@@ -263,7 +263,7 @@ static void exec_svc(void *dat)
 static int cmd_add(int argc, char *argv[])
 {
 	struct service *svc;
-	int j;
+	int j, result = 0;
 
 	if (myuid && peeruid && (myuid != peeruid))
 		/* block on regular user mismatch */
@@ -276,6 +276,10 @@ static int cmd_add(int argc, char *argv[])
 	/* copy args */
 	--argc; ++argv;
 	svc->args = malloc(sizeof(char *)*(argc+1));
+	if (!svc->args) {
+		result = -ENOMEM;
+		goto failed;
+	}
 	for (j = 0; j < argc; ++j) {
 		svc->args[j] = strdup(argv[j]);
 		if (!svc->argv && !strchr(svc->args[j], '='))
@@ -292,6 +296,14 @@ static int cmd_add(int argc, char *argv[])
 	/* exec now */
 	exec_svc(svc);
 	return svc->pid;
+failed:
+	if (svc->args) {
+		for (j = 0; svc->args[j]; ++j)
+			free(svc->args[j]);
+		free(svc->args);
+	}
+	free(svc);
+	return result;
 }
 
 static void cleanup_svc(struct service *svc)
