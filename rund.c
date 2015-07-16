@@ -247,8 +247,10 @@ static void exec_svc(void *dat)
 				mylog(LOG_CRIT, "initgroups for %s: %s", pw->pw_name, ESTR(errno));
 			if (setgid(pw->pw_gid) < 0)
 				mylog(LOG_CRIT, "setgid %i: %s", pw->pw_gid, ESTR(errno));
-			if (setuid(pw->pw_gid) < 0)
+			if (setuid(pw->pw_uid) < 0)
 				mylog(LOG_CRIT, "setuid %i: %s", svc->uid, ESTR(errno));
+			if (chdir(pw->pw_dir) < 0)
+				mylog(LOG_ERR, "chdir %s: %s", pw->pw_dir, ESTR(errno));
 			setenv("HOME", pw->pw_dir, 1);
 			setenv("USER", pw->pw_name, 1);
 		}
