@@ -15,6 +15,8 @@ CPPFLAGS+= -DVERSION=\"$(LOCALVERSION)\"
 rund: LDLIBS+= -lrt
 rund: lib/libt.o
 
+runc: LDLIBS+= -lm
+
 clean:
 	rm -rf $(PROGS) $(wildcard *.o lib/*.o)
 
