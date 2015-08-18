@@ -52,6 +52,12 @@ static const char help_msg[] =
 	" syslog\n"
 	" loglevel\n"
 	" redir\n"
+	" env KEY[=VALUE]\n"
+	"	Change environment variable\n"
+	" env KEY=\n"
+	"	unset environment variable\n"
+	" status [KEY=VALUE] [PROGRAM] [ARGUMENT ...]\n"
+	"	Retrieve status from rund\n"
 	;
 static const char optstring[] = "+?Vqr::m:s:";
 
