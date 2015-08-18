@@ -266,7 +266,7 @@ static void exec_svc(void *dat)
 static int cmd_add(int argc, char *argv[])
 {
 	struct service *svc;
-	int j, result = 0;
+	int j, f, result = 0;
 
 	if (myuid && peeruid && (myuid != peeruid))
 		/* block on regular user mismatch */
@@ -283,7 +283,7 @@ static int cmd_add(int argc, char *argv[])
 		result = -ENOMEM;
 		goto failed;
 	}
-	for (j = 0; j < argc; ++j) {
+	for (f = j = 0; j < argc; ++j) {
 		if (!svc->argv && !strncmp("USER=", argv[j], 5)) {
 			/* still in environment, and user provided */
 			struct passwd *pw;
@@ -302,11 +302,12 @@ static int cmd_add(int argc, char *argv[])
 			svc->uid = pw->pw_uid;
 			continue;
 		}
-		svc->args[j] = strdup(argv[j]);
-		if (!svc->argv && !strchr(svc->args[j], '='))
-			svc->argv = svc->args+j;
+		svc->args[f] = strdup(argv[j]);
+		if (!svc->argv && !strchr(svc->args[f], '='))
+			svc->argv = svc->args+f;
+		++f;
 	}
-	svc->args[j] = NULL;
+	svc->args[f] = NULL;
 	if (!svc->argv)
 		svc->argv = svc->args;
 
