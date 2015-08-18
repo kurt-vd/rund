@@ -737,9 +737,16 @@ int main(int argc, char *argv[])
 			}
 			cmsg = CMSG_FIRSTHDR(&msg);
 			if (cmsg && cmsg->cmsg_level == SOL_SOCKET &&
-					cmsg->cmsg_type == SCM_CREDENTIALS)
-				peeruid = ((struct ucred *)CMSG_DATA(cmsg))->uid;
-			else {
+					cmsg->cmsg_type == SCM_CREDENTIALS) {
+				/* instead of accessing the data directly, and
+				 * issuing a 'breaking strict aliasing' compiler
+				 * warning, I decided to do this the proper way
+				 */
+				struct ucred uc = { .uid = ~0, .gid = ~0, .pid = ~0, };
+
+				memcpy(&uc, CMSG_DATA(cmsg), sizeof(uc));
+				peeruid = uc.uid;
+			} else {
 				/* no permissions received */
 				ret = -EINVAL;
 				goto sock_reply;
