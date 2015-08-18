@@ -478,13 +478,22 @@ static int cmd_redir(int argc, char *argv[])
 
 static int cmd_env(int argc, char *argv[])
 {
+	char *valstr;
+
 	if (myuid != (peeruid ?: myuid))
 		return -EPERM;
 
-	if (argc < 3)
+	if (argc < 2)
 		return -EINVAL;
-	setenv(argv[1], argv[2], 1);
-	return 0;
+
+	valstr = strchr(argv[1], '=');
+	if (valstr) {
+		*valstr++ = 0;
+		if (!*valstr)
+			return unsetenv(argv[1]);
+	} else
+		valstr = "";
+	return setenv(argv[1], valstr, 1);
 }
 
 static char sbuf[16*1024];
