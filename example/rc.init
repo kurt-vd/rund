@@ -1,0 +1,109 @@
+#!/bin/sh
+
+# systemwide settings
+umask 002
+export PATH=/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin
+
+echo "[`ktstamp`] Starting system ..."
+
+# push environment into rund
+runc -q env PATH="$PATH"
+if [ -f /etc/environment ]; then
+	. /etc/environment
+	sed -e "/^#/d" -e "/^$/d" /etc/environment | xargs -L1 -d\\n runc -q env
+fi
+
+# set reboot behaviour
+ctrlaltdel soft
+
+# mount necessary filesystems
+mount -n nodev /sys -t sysfs
+mount -n nodev /proc -t proc
+
+# mount + stuff /dev
+echo "[`ktstamp`] Starting fdev ..."
+mount -n nodev /dev -t devtmpfs -o size=10M,mode=0755
+
+## clean kernel configured hotplug program
+echo "" > /proc/sys/kernel/hotplug
+
+# stuff /dev
+{
+	# Shared memory
+	mkdir /dev/shm
+	mount nodev /dev/shm -t tmpfs
+	chmod a+w,+t /dev/shm
+
+	# PTS
+	mkdir /dev/pts
+	mount -n nodev /dev/pts -t devpts
+} &
+
+# configure some fixed network stuff
+{
+	hostname -F /etc/HOSTNAME
+	ip link set lo up
+} &
+
+{
+	if [ -f /etc/random-seed ]; then 
+		echo "[`ktstamp`] Setting random seed"
+		cat /etc/random-seed > /dev/urandom
+	fi
+
+} &
+
+echo "[`ktstamp`] Starting filesystems ..."
+# mount / read-write
+mount -n / -o remount,rw
+
+# fix /tmp
+{
+	rm -rf /tmp
+	mkdir /tmp
+	chmod 01777 /tmp
+} &
+
+{
+	while test ! -c /dev/rtc0; do sleep 0.25; done
+	echo Restoring system clock
+	hwclock -su
+} &
+
+find /var/run -type f -name *.pid | xargs rm -f &
+find /var/run -type s | xargs rm -f &
+
+# synchronization point
+wait
+# READY
+
+echo "[`ktstamp`] Starting syslog ..."
+# syslog
+runc add syslogd -r -n
+runc add klogd -n
+
+echo "[`ktstamp`] starting logind ..."
+# virtual terminals
+runc add TERM=linux logind /dev/tty2 /dev/tty3 /dev/tty4 /dev/tty5 /dev/tty6
+
+echo "[`ktstamp`] starting Xorg ..."
+## Xorg
+runc add USER=kurt xinit
+
+echo "[`ktstamp`] starting SSH ..."
+## ssh
+mkdir -p -m 0755 /var/run/sshd
+runc add /usr/sbin/sshd -D
+
+echo "[`ktstamp`] starting other services ..."
+#rm /var/run/ifplugd*
+## networks
+runc add ifplugd -i lan -u1 -d0 --no-daemon --ignore-fail
+iw reg set BE &
+runc add wpa_supplicant -iwlan0 -c /etc/wpa_supplicant.conf
+runc add ifplugd -i wlan0 -u1 -d3 --no-daemon --no-syslog --ignore-fail
+
+inetd -d
+runc add acpid -f
+
+echo "[`ktstamp`] system up"
