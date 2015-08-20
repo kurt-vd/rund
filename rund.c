@@ -27,12 +27,6 @@ static const char *const rcrebootcmd[] = { "/etc/rc.shutdown", "reboot", NULL };
 static const char *const rcpoweroffcmd[] = { "/etc/rc.shutdown", "poweroff", NULL };
 static const char *const emergencycmd[] = { "/sbin/sulogin", NULL, };
 
-#ifdef ANYPID
-static const char *rundsock = "@rund";
-#else
-#define rundsock "@rund"
-#endif
-
 /* logging */
 static int syslog_open;
 static int loglevel = LOG_WARNING;
@@ -66,9 +60,7 @@ static int peernamelen;
 static int peeruid;
 static int myuid;
 static sigset_t savedset;
-#ifdef ANYPID
 static int mypid;
-#endif
 
 /* launch a process for init service */
 static int spawn(const char *const argv[])
@@ -80,7 +72,6 @@ static int spawn(const char *const argv[])
 		mylog(0, "fork: %s", ESTR(errno));
 		return -errno;
 	} else if (pid == 0) {
-		setenv("RUNDSOCK", rundsock, 1);
 		sigprocmask(SIG_SETMASK, &savedset, NULL);
 		setsid();
 		execvp(*argv, (char **)argv);
@@ -585,16 +576,14 @@ int main(int argc, char *argv[])
 	int nargs;
 	const struct cmd *cmd;
 
-#if ANYPID
 	mypid = getpid();
-	rundsock = getenv("RUNDSOCK") ?: rundsock;
-	strcpy(name.sun_path+1, rundsock+1);
-#else
-	if ((getpid() != 1) && (getppid() != 1)) {
+	if (mypid == 1) {
+	} else if ((argc > 1) && (*argv[1] == '@'))
+		strcpy(name.sun_path+1, &argv[1][1]);
+	else {
 		printf("%s %s\n", NAME, VERSION);
 		return 0;
 	}
-#endif
 	myuid = getuid();
 	chdir("/");
 	fd = open("/dev/null", O_RDWR);
@@ -634,12 +623,10 @@ int main(int argc, char *argv[])
 	}
 
 	/* launch system start */
-#ifdef ANYPID
 	if (mypid != 1)
 		rcinitpid = 0;
 	else
-#endif
-	rcinitpid = spawn(rcinitcmd);
+		rcinitpid = spawn(rcinitcmd);
 	while (1) {
 		libt_flush();
 
@@ -690,10 +677,8 @@ int main(int argc, char *argv[])
 				/* reboot */
 				if (rcinitpid)
 					kill(-rcinitpid, SIGTERM);
-#ifdef ANYPID
 				if (mypid != 1)
 					exit(0);
-#endif
 				mylog(LOG_INFO, "reboot ...");
 				spawn(rcrebootcmd);
 				break;
@@ -701,10 +686,8 @@ int main(int argc, char *argv[])
 				/* poweroff */
 				if (rcinitpid)
 					kill(-rcinitpid, SIGTERM);
-#ifdef ANYPID
 				if (mypid != 1)
 					exit(0);
-#endif
 				mylog(LOG_INFO, "poweroff ...");
 				spawn(rcpoweroffcmd);
 				break;
