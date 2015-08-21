@@ -542,7 +542,7 @@ int main(int argc, char *argv[])
 {
 	int ret, fd;
 	struct service *svc;
-	pid_t rcinitpid, pid;
+	pid_t rcpid, pid;
 	struct pollfd fset[] = {
 		{ .events = POLLIN, },
 		{ .events = POLLIN, },
@@ -624,9 +624,9 @@ int main(int argc, char *argv[])
 
 	/* launch system start */
 	if (mypid != 1)
-		rcinitpid = 0;
+		rcpid = 0;
 	else
-		rcinitpid = spawn(rcinitcmd);
+		rcpid = spawn(rcinitcmd);
 	while (1) {
 		libt_flush();
 
@@ -645,8 +645,8 @@ int main(int argc, char *argv[])
 			case SIGCHLD:
 				/* reap lost children */
 				while ((pid = waitpid(-1, NULL, WNOHANG)) > 0) {
-					if (rcinitpid == pid)
-						rcinitpid = 0;
+					if (rcpid == pid)
+						rcpid = 0;
 					/* find service */
 					for (svc = svcs; svc; svc = svc->next) {
 						if (pid != svc->pid)
@@ -675,21 +675,23 @@ int main(int argc, char *argv[])
 				break;
 			case SIGINT:
 				/* reboot */
-				if (rcinitpid)
-					kill(-rcinitpid, SIGTERM);
+				if (rcpid)
+					/* kill pending rc.init/rc.shutdown */
+					kill(-rcpid, SIGTERM);
 				if (mypid != 1)
 					exit(0);
 				mylog(LOG_INFO, "reboot ...");
-				spawn(rcrebootcmd);
+				rcpid = spawn(rcrebootcmd);
 				break;
 			case SIGTERM:
 				/* poweroff */
-				if (rcinitpid)
-					kill(-rcinitpid, SIGTERM);
+				if (rcpid)
+					/* kill pending rc.init/rc.shutdown */
+					kill(-rcpid, SIGTERM);
 				if (mypid != 1)
 					exit(0);
 				mylog(LOG_INFO, "poweroff ...");
-				spawn(rcpoweroffcmd);
+				rcpid = spawn(rcpoweroffcmd);
 				break;
 			case SIGHUP:
 				/* retry throttled services */
