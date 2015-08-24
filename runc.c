@@ -98,6 +98,19 @@ static int sendcred(int sock, const void *dat, unsigned int len, int flags)
 	return sendmsg(sock, &msg, flags);
 }
 
+static int ttytest(void)
+{
+	char lbuf[64];
+	if (isatty(STDERR_FILENO) <= 0)
+		return 0;
+
+	if (readlink("/proc/self/fd/2", lbuf, sizeof(lbuf)) < 0)
+		return 0;
+	if (!strcmp("/dev/console", lbuf))
+		return 0;
+	return 1;
+}
+
 /* main process */
 int main(int argc, char *argv[])
 {
@@ -116,7 +129,7 @@ int main(int argc, char *argv[])
 	char *bufp, *str;
 
 	/* assume quiet operation on non-terminal invocation */
-	quiet = isatty(STDERR_FILENO) <= 0;
+	quiet = !ttytest();
 	/* parse program options */
 	while ((opt = getopt(argc, argv, optstring)) != -1)
 	switch (opt) {
