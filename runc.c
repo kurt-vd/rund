@@ -45,6 +45,7 @@ static const char help_msg[] =
 	"	Add a new service\n"
 	"	Special environment variables:\n"
 	"	USER=	to run as different user\n"
+	"	INTERVAL=	to run with intervals\n"
 	" remove [KEY=VALUE ...] [PROGRAM] [ARGUMENT ...]\n"
 	"	Remove a service\n"
 	" remove *\n"

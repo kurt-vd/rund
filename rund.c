@@ -188,11 +188,13 @@ struct service {
 	pid_t pid;
 	int flags;
 		#define FL_REMOVE	0x01
+		#define FL_INTERVAL	0x02
 	double starttime;
 	int delay[2]; /* create fibonacci on the fly */
 	char **args;
 	char **argv;
 	int uid;
+	double interval;
 };
 
 /* global list */
@@ -291,6 +293,10 @@ static int cmd_add(int argc, char *argv[])
 				goto failed;
 			}
 			svc->uid = pw->pw_uid;
+			continue;
+		} else if (!svc->argv && !strncmp("INTERVAL=", argv[j], 9)) {
+			svc->interval = strtod(argv[j], NULL);
+			svc->flags |= FL_INTERVAL;
 			continue;
 		}
 		svc->args[f] = strdup(argv[j]);
@@ -506,6 +512,8 @@ static int cmd_status(int argc, char *argv[])
 			bufp += sprintf(bufp, ".pid=%u", svc->pid) +1;
 		if (svc->uid)
 			bufp += sprintf(bufp, ".uid=%u", svc->uid) +1;
+		if (svc->flags & FL_INTERVAL)
+			bufp += sprintf(bufp, "INTERVAL=%lf", svc->interval) +1;
 		for (j = 0; svc->args[j]; ++j) {
 			strcpy(bufp, svc->args[j]);
 			bufp += strlen(bufp)+1;
@@ -656,7 +664,9 @@ int main(int argc, char *argv[])
 							cleanup_svc(svc);
 							break;
 						}
-						if ((svc->starttime + 2) < libt_now()) {
+						if (svc->flags & FL_INTERVAL) {
+							libt_add_timeout(svc->interval, exec_svc, svc);
+						} else if ((svc->starttime + 2) < libt_now()) {
 							/* reset delays */
 							svc->delay[0] =
 							svc->delay[1] = 0;
@@ -697,7 +707,8 @@ int main(int argc, char *argv[])
 				/* retry throttled services */
 				mylog(LOG_INFO, "reload ...");
 				for (svc = svcs; svc; svc = svc->next) {
-					if (!svc->pid && svc->delay[1]) {
+					if (!svc->pid && (svc->delay[1] ||
+						(svc->flags & FL_INTERVAL))) {
 						/* re-schedule immediate */
 						libt_remove_timeout(exec_svc, svc);
 						libt_add_timeout(0, exec_svc, svc);
