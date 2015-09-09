@@ -43,6 +43,8 @@ static const char help_msg[] =
 	"Commands:\n"
 	" add [KEY=VALUE ...] PROGRAM [ARGUMENT ...]\n"
 	"	Add a new service\n"
+	"	Special environment variables:\n"
+	"	USER=	to run as different user\n"
 	" remove [KEY=VALUE ...] [PROGRAM] [ARGUMENT ...]\n"
 	"	Remove a service\n"
 	" remove *\n"
