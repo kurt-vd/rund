@@ -61,6 +61,11 @@ static const char help_msg[] =
 	"	unset environment variable\n"
 	" status [KEY=VALUE] [PROGRAM] [ARGUMENT ...]\n"
 	"	Retrieve status from rund\n"
+	" exec PROGRAM [ARGUMENT ...]\n"
+	"	exec() another program, possible the same\n"
+	"	This solves the case where pid 1 has open files\n"
+	"	that were removed, which keeps the filesystem busy\n"
+	"	for writing\n"
 	;
 static const char optstring[] = "+?Vqr::m:s:";
 

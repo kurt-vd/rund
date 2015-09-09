@@ -526,6 +526,23 @@ static int cmd_status(int argc, char *argv[])
 	return ndone ?: -err;
 }
 
+static int cmd_exec(int argc, char *argv[])
+{
+	if (myuid != (peeruid ?: myuid))
+		return -EPERM;
+	if (argc < 2)
+		return -EINVAL;
+	mylog(LOG_ERR, "request to exec %s ...", argv[1]);
+
+	/* send ack now that it is still possible */
+	if (sendto(sock, "0", 1, 0, (void *)&peername, peernamelen) < 0)
+		return -errno;
+
+	execvp(argv[1], argv+1);
+	mylog(LOG_ERR, "fork() failed: %s", ESTR(errno));
+	return -errno;
+}
+
 /* remote commands */
 struct cmd {
 	const char *name;
@@ -542,6 +559,7 @@ struct cmd {
 	{ "redir", cmd_redir, },
 	{ "env", cmd_env, },
 	{ "status", cmd_status, },
+	{ "exec", cmd_exec, },
 	{ },
 };
 
