@@ -22,10 +22,9 @@
 
 #define NAME "rund"
 
-static const char *const rcinitcmd[] = { "/etc/rc.init", NULL };
-static const char *const rcrebootcmd[] = { "/etc/rc.shutdown", "reboot", NULL };
-static const char *const rcpoweroffcmd[] = { "/etc/rc.shutdown", "poweroff", NULL };
-static const char *const emergencycmd[] = { "/sbin/sulogin", NULL, };
+#define INIT "/etc/rc.init"
+#define STOP "/etc/rc.shutdown"
+#define HELP "/sbin/sulogin"
 
 /* logging */
 static int syslog_open;
@@ -61,24 +60,6 @@ static int peeruid;
 static int myuid;
 static sigset_t savedset;
 static int mypid;
-
-/* launch a process for init service */
-static int spawn(const char *const argv[])
-{
-	pid_t pid;
-
-	pid = fork();
-	if (pid < 0) {
-		mylog(0, "fork: %s", ESTR(errno));
-		return -errno;
-	} else if (pid == 0) {
-		sigprocmask(SIG_SETMASK, &savedset, NULL);
-		setsid();
-		execvp(*argv, (char **)argv);
-		mylog(LOG_CRIT, "execvp: %s", ESTR(errno));
-	}
-	return pid;
-}
 
 static int parse_nullbuff(char *buf, int len, char **pargv[])
 {
@@ -601,6 +582,7 @@ int main(int argc, char *argv[])
 	char **args;
 	int nargs;
 	const struct cmd *cmd;
+	char *todo;
 
 	mypid = getpid();
 	if (mypid == 1) {
@@ -651,8 +633,13 @@ int main(int argc, char *argv[])
 	/* launch system start */
 	if (mypid != 1)
 		rcpid = 0;
-	else
-		rcpid = spawn(rcinitcmd);
+	else if ((rcpid = fork()) == 0) {
+		sigprocmask(SIG_SETMASK, &savedset, NULL);
+		execvp(INIT, argv);
+		mylog(LOG_CRIT, "execvp %s: %s", ESTR(errno), INIT);
+	} else if (rcpid < 0)
+		mylog(LOG_CRIT, "fork: %s", ESTR(errno));
+
 	while (1) {
 		libt_flush();
 
@@ -662,6 +649,7 @@ int main(int argc, char *argv[])
 
 		if (fset[0].revents) {
 			/* signals */
+			todo = NULL;
 
 			ret = read(fset[0].fd, &info, sizeof(info));
 			if (ret < 0)
@@ -702,24 +690,24 @@ int main(int argc, char *argv[])
 				}
 				break;
 			case SIGINT:
-				/* reboot */
-				if (rcpid)
-					/* kill pending rc.init/rc.shutdown */
-					kill(-rcpid, SIGTERM);
-				if (mypid != 1)
-					exit(0);
-				mylog(LOG_INFO, "reboot ...");
-				rcpid = spawn(rcrebootcmd);
-				break;
+				todo = todo ?: "reboot";
 			case SIGTERM:
-				/* poweroff */
-				if (rcpid)
+				todo = todo ?: "poweroff";
+
+				if (rcpid > 0)
 					/* kill pending rc.init/rc.shutdown */
 					kill(-rcpid, SIGTERM);
 				if (mypid != 1)
 					exit(0);
-				mylog(LOG_INFO, "poweroff ...");
-				rcpid = spawn(rcpoweroffcmd);
+				mylog(LOG_INFO, "%s ...", todo);
+				rcpid = fork();
+				if (rcpid < 0)
+					mylog(LOG_CRIT, "fork: %s", ESTR(errno));
+				else if (!rcpid) {
+					sigprocmask(SIG_SETMASK, &savedset, NULL);
+					execl(STOP, STOP, todo, NULL);
+					mylog(LOG_CRIT, "execl %s %s: %s", ESTR(errno), STOP, todo);
+				}
 				break;
 			case SIGHUP:
 				/* retry throttled services */
@@ -802,8 +790,8 @@ sock_done:
 	/* not reachable */
 	return EXIT_SUCCESS;
 emergency:
-	execvp(*emergencycmd, (char **)emergencycmd);
-	mylog(LOG_ERR, "execvp %s", *emergencycmd);
+	execl(HELP, HELP, NULL);
+	mylog(LOG_ERR, "execl %s", HELP);
 	execlp("/bin/sh", "sh", NULL);
 	mylog(LOG_ERR, "execvp /bin/sh");
 	return EXIT_FAILURE;
