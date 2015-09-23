@@ -1,5 +1,10 @@
 #!/bin/sh
 
+if [ "$1" = "-noinit" ]; then
+	# protect against exec'd instance of rund
+	exit 0;
+fi
+
 # systemwide settings
 umask 002
 export PATH=/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin

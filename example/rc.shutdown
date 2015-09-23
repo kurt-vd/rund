@@ -33,12 +33,12 @@ FILESYSTEMS=`grep -v nodev /proc/filesystems | xargs echo | sed -e "s/ /,/g"`
 echo [`ktstamp`] Unmount $FILESYSTEMS
 umount -n -a -r -t "$FILESYSTEMS"
 
-echo [`ktstamp`] Remount root as read-only
 if ! mount -o remount,ro /; then
 	# maybe pid #1 has files open that were replaced/deleted
 	# exec itself to solve this
 	echo [`ktstamp`] exec rund to release rootfs
-	runc exec rund
+	runc exec rund -noinit
+	echo [`ktstamp`] Remount root as read-only
 	if ! mount -o remount,ro /; then
 		echo [`ktstamp`] / did not umount cleanly
 	fi
