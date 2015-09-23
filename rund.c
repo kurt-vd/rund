@@ -59,7 +59,6 @@ static int peernamelen;
 static int peeruid;
 static int myuid;
 static sigset_t savedset;
-static int mypid;
 
 static int parse_nullbuff(char *buf, int len, char **pargv[])
 {
@@ -584,8 +583,7 @@ int main(int argc, char *argv[])
 	const struct cmd *cmd;
 	char *todo;
 
-	mypid = getpid();
-	if (mypid == 1) {
+	if (getpid() == 1) {
 	} else if ((argc > 1) && (*argv[1] == '@'))
 		strcpy(name.sun_path+1, &argv[1][1]);
 	else {
@@ -631,7 +629,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* launch system start */
-	if (mypid != 1)
+	if (getpid() != 1)
 		rcpid = 0;
 	else if ((rcpid = fork()) == 0) {
 		sigprocmask(SIG_SETMASK, &savedset, NULL);
@@ -697,7 +695,7 @@ int main(int argc, char *argv[])
 				if (rcpid > 0)
 					/* kill pending rc.init/rc.shutdown */
 					kill(-rcpid, SIGTERM);
-				if (mypid != 1)
+				if (getpid() != 1)
 					exit(0);
 				mylog(LOG_INFO, "%s ...", todo);
 				rcpid = fork();
