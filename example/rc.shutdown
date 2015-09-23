@@ -9,19 +9,18 @@ reboot|poweroff)
 	;;
 esac
 
-echo [`ktstamp`] Shutdown
-
-echo [`ktstamp`] Save system clock
+echo [`ktstamp -k`] Shutdown ...
+echo [`ktstamp -k`] Save system clock
 hwclock -wu
 
-echo [`ktstamp`] Store random seed
+echo [`ktstamp -k`] Store random seed
 dd if=/dev/urandom of=/var/cache/random-seed iflag=nonblock count=1 bs=512 2>/dev/null &
 
-echo [`ktstamp`] Kill services
-runc -q remove "*"
+echo [`ktstamp -k`] Kill services
+runc remove "*"
 runc -r0.25 -m10 removing
 
-echo [`ktstamp`] Kill remaining processes
+echo [`ktstamp -k`] Kill remaining processes
 
 kill -s TERM -- -1
 sleep 3
@@ -30,21 +29,21 @@ kill -s KILL -- -1
 sleep 0.5
 
 FILESYSTEMS=`grep -v nodev /proc/filesystems | xargs echo | sed -e "s/ /,/g"`
-echo [`ktstamp`] Unmount $FILESYSTEMS
+echo [`ktstamp -k`] Unmount $FILESYSTEMS
 umount -n -a -r -t "$FILESYSTEMS"
 
 if ! mount -o remount,ro /; then
 	# maybe pid #1 has files open that were replaced/deleted
 	# exec itself to solve this
-	echo [`ktstamp`] exec rund to release rootfs
+	echo [`ktstamp -k`] exec rund to release rootfs
 	runc exec rund -noinit
-	echo [`ktstamp`] Remount root as read-only
+	echo [`ktstamp -k`] Remount root as read-only
 	if ! mount -o remount,ro /; then
-		echo [`ktstamp`] / did not umount cleanly
+		echo [`ktstamp -k`] / did not remount cleanly
 	fi
 fi
 
-echo [`ktstamp`] bye
+echo [`ktstamp -k`] bye
 
 ctrlaltdel hard
 # reboot or poweroff

@@ -4,18 +4,16 @@ if [ "$1" = "-noinit" ]; then
 	# protect against exec'd instance of rund
 	exit 0;
 fi
+echo "[`ktstamp -k`] Start system ..."
 
 # systemwide settings
 umask 002
 export PATH=/usr/local/sbin:/usr/sbin:/sbin:/usr/local/bin:/usr/bin:/bin
-
-echo "[`ktstamp`] Start system ..."
-
-# push environment into rund
-runc -q env PATH="$PATH"
+runc env PATH="$PATH"
 if [ -f /etc/environment ]; then
 	. /etc/environment
-	sed -e "/^#/d" -e "/^$/d" /etc/environment | xargs -L1 -d\\n runc -q env
+	# push environment into rund
+	sed -e "/^#/d" -e "/^$/d" /etc/environment | xargs -L1 -d\\n runc env
 fi
 
 # set reboot behaviour
@@ -32,8 +30,6 @@ if ! grep " /dev " /proc/mounts > /dev/null; then
 	mount -n nodev /dev -t devtmpfs -o size=10M,mode=0755
 fi
 
-## clean kernel configured hotplug program
-echo "" > /proc/sys/kernel/hotplug
 
 # stuff /dev
 {
@@ -55,13 +51,12 @@ echo "" > /proc/sys/kernel/hotplug
 
 {
 	if [ -f /var/cache/random-seed ]; then 
-		echo "[`ktstamp`] Set random seed"
+		echo "[`ktstamp -k`] Set random seed"
 		cat /var/cache/random-seed > /dev/urandom
 	fi
-
 } &
 
-echo "[`ktstamp`] Start filesystems ..."
+echo "[`ktstamp -k`] Start filesystems ..."
 # mount / read-write
 mount -n / -o remount,rw
 
@@ -74,7 +69,7 @@ mount -n / -o remount,rw
 
 {
 	while test ! -c /dev/rtc0; do sleep 0.25; done
-	echo "[`ktstamp`] Restore system clock"j
+	echo "[`ktstamp -k`] Restore system clock"
 	hwclock -su
 } &
 
@@ -97,25 +92,22 @@ wait
 #wait
 
 # or you could place it all inline here...
-echo "[`ktstamp`] Start syslog ..."
+echo "[`ktstamp -k`] Start syslog ..."
 # syslog
 runc add syslogd -r -n
 runc add klogd -n
 
-echo "[`ktstamp`] Start logins ..."
 # virtual terminals
 runc add TERM=linux logind /dev/tty2 /dev/tty3 /dev/tty4 /dev/tty5 /dev/tty6
 
-echo "[`ktstamp`] Start Xorg session ..."
 ## Xorg
 runc add USER=kurt xinit
 
-echo "[`ktstamp`] Start SSH ..."
 ## ssh
 mkdir -p -m 0755 /var/run/sshd
 runc add /usr/sbin/sshd -D
 
-echo "[`ktstamp`] Start network ..."
+echo "[`ktstamp -k`] Start network ..."
 #rm /var/run/ifplugd*
 ## networks
 runc add ifplugd -i lan -u1 -d0 --no-daemon --ignore-fail
@@ -126,4 +118,7 @@ runc add ifplugd -i wlan0 -u1 -d3 --no-daemon --no-syslog --ignore-fail
 inetd -d
 runc add acpid -f
 
-echo "[`ktstamp`] system up"
+if [ -f /etc/os-release ]; then
+	. /etc/os-release
+fi
+echo "[`ktstamp -k`] System '$PRETTY_NAME' ready"
