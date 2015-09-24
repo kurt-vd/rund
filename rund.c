@@ -280,6 +280,20 @@ static int cmd_add(int argc, char *argv[])
 			svc->interval = strtod(argv[j], NULL);
 			svc->flags |= FL_INTERVAL;
 			continue;
+		} else if (!strncmp("PID=", argv[j], 4)) {
+# if 0
+			/* preset pid */
+			svc->pid = strtoul(argv[j]+4, NULL, 0);
+			/* test process exists */
+			if (kill(svc->pid, 0) < 0)
+				svc->pid =0 ;
+			/* 2 problems here:
+			 * svc->pid is tested as root, which may not be feasible
+			 * a service may exist already, I should inspect my own
+			   list of pids first to avoid duplicates
+			 */
+#endif
+			continue;
 		}
 		svc->args[f] = strdup(argv[j]);
 		if (!svc->argv && !strchr(svc->args[f], '='))
@@ -491,7 +505,7 @@ static int cmd_status(int argc, char *argv[])
 		bufp = sbuf;
 		*bufp++ = '>';
 		if (svc->pid)
-			bufp += sprintf(bufp, ".pid=%u", svc->pid) +1;
+			bufp += sprintf(bufp, "PID=%u", svc->pid) +1;
 		if (svc->uid)
 			bufp += sprintf(bufp, "USER=#%u", svc->uid) +1;
 		if (svc->flags & FL_INTERVAL)
