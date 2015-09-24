@@ -261,18 +261,20 @@ static int cmd_add(int argc, char *argv[])
 			/* still in environment, and user provided */
 			struct passwd *pw;
 
-			pw = getpwnam(argv[j]+5);
-			if (!pw) {
+			if (argv[j][5] == '#') {
+				svc->uid = strtoul(argv[j]+6, NULL, 0);
+			} else if ((pw = getpwnam(argv[j]+5)) == NULL) {
 				result = -EINVAL;
 				mylog(LOG_WARNING, "user '%s' unknown", argv[j]+5);
 				goto failed;
+			} else {
+				svc->uid = pw->pw_uid;
 			}
-			if (peeruid && (pw->pw_uid != peeruid)) {
+			if (peeruid && (svc->uid != peeruid)) {
 				result = -EPERM;
 				mylog(LOG_WARNING, "only root may change user");
 				goto failed;
 			}
-			svc->uid = pw->pw_uid;
 			continue;
 		} else if (!svc->argv && !strncmp("INTERVAL=", argv[j], 9)) {
 			svc->interval = strtod(argv[j], NULL);
@@ -491,7 +493,7 @@ static int cmd_status(int argc, char *argv[])
 		if (svc->pid)
 			bufp += sprintf(bufp, ".pid=%u", svc->pid) +1;
 		if (svc->uid)
-			bufp += sprintf(bufp, ".uid=%u", svc->uid) +1;
+			bufp += sprintf(bufp, "USER=#%u", svc->uid) +1;
 		if (svc->flags & FL_INTERVAL)
 			bufp += sprintf(bufp, "INTERVAL=%lf", svc->interval) +1;
 		for (j = 0; svc->args[j]; ++j) {
