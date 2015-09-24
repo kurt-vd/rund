@@ -622,18 +622,20 @@ int main(int argc, char *argv[])
 	/* setup signals */
 	sigfillset(&set);
 	sigprocmask(SIG_BLOCK, &set, &savedset);
-	ret = fset[0].fd = signalfd(-1, &set, SFD_NONBLOCK | SFD_CLOEXEC);
+	ret = fset[0].fd = signalfd(-1, &set, 0);
 	if (ret < 0) {
 		mylog(LOG_ERR, "signalfd failed: %s", ESTR(errno));
 		goto emergency;
 	}
+	fcntl(ret, F_SETFD, fcntl(ret, F_GETFD) | FD_CLOEXEC);
 
 	/* open server socket */
-	fset[1].fd = sock = socket(PF_UNIX, SOCK_DGRAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+	fset[1].fd = sock = socket(PF_UNIX, SOCK_DGRAM, 0);
 	if (sock < 0) {
 		mylog(LOG_ERR, "socket(unix, ...) failed: %s", ESTR(errno));
 		goto emergency;
 	}
+	fcntl(sock, F_SETFD, fcntl(sock, F_GETFD) | FD_CLOEXEC);
 
 	ret = bind(sock, (void *)&name, sizeof(name));
 	if (ret < 0) {
