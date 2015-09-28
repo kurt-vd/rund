@@ -535,7 +535,7 @@ static int cmd_exec(int argc, char *argv[])
 		return -errno;
 
 	execvp(argv[1], argv+1);
-	mylog(LOG_ERR, "fork() failed: %s", ESTR(errno));
+	mylog(LOG_ERR, "execvp() failed: %s", ESTR(errno));
 	return -errno;
 }
 
