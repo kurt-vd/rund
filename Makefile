@@ -1,4 +1,4 @@
-PROGS	= rund runc sockwait ktstamp
+PROGS	= rund runc sysreboot sockwait ktstamp
 default	: $(PROGS)
 
 LOCALVERSION:= $(shell git describe --always --tags --dirty)

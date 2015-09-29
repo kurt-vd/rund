@@ -4,6 +4,7 @@
 # binaries
 rund
 runc
+sysreboot
 sockwait
 ktstamp
 

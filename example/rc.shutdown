@@ -45,9 +45,9 @@ fi
 
 echo [`ktstamp -k`] bye
 
-ctrlaltdel hard
+sysreboot cadhard
 # reboot or poweroff
-"$1" -f
+sysreboot "$1"
 
 sleep 1
 sulogin

@@ -17,7 +17,7 @@ if [ -f /etc/environment ]; then
 fi
 
 # set reboot behaviour
-ctrlaltdel soft
+sysreboot cadsoft
 
 # mount necessary filesystems
 mount -n nodev /sys -t sysfs
