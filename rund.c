@@ -705,6 +705,8 @@ int main(int argc, char *argv[])
 					}
 				}
 				break;
+			case SIGUSR1:
+				todo = todo ?: "halt";
 			case SIGINT:
 				todo = todo ?: "reboot";
 			case SIGTERM:
