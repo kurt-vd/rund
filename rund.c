@@ -238,7 +238,7 @@ static void exec_svc(void *dat)
 
 static int cmd_add(int argc, char *argv[])
 {
-	struct service *svc;
+	struct service *svc, *svc2;
 	int j, f, result = 0;
 
 	if (myuid && peeruid && (myuid != peeruid))
@@ -281,18 +281,29 @@ static int cmd_add(int argc, char *argv[])
 			svc->flags |= FL_INTERVAL;
 			continue;
 		} else if (!strncmp("PID=", argv[j], 4)) {
-# if 0
+			/* it is way more complicated to allow this for non-root
+			 * without leaving security holes (i.e. user A adds svc
+			 * with pid P, which is currently owned by user B, and
+			 * allows A to kill P).
+			 * I also see no real usecase for regular users.
+			 */
+			if (peeruid != 0) {
+				result = -EPERM;
+				mylog(LOG_WARNING, "only root may assign PIDs");
+				goto failed;
+			}
 			/* preset pid */
 			svc->pid = strtoul(argv[j]+4, NULL, 0);
+			for (svc2 = svcs; svc2; svc2 = svc2->next) {
+				if (svc2->pid == svc->pid) {
+					result = -EEXIST;
+					mylog(LOG_WARNING, "I already manage PID %u", svc->pid);
+					goto failed;
+				}
+			}
 			/* test process exists */
 			if (kill(svc->pid, 0) < 0)
 				svc->pid =0 ;
-			/* 2 problems here:
-			 * svc->pid is tested as root, which may not be feasible
-			 * a service may exist already, I should inspect my own
-			   list of pids first to avoid duplicates
-			 */
-#endif
 			continue;
 		}
 		svc->args[f] = strdup(argv[j]);
@@ -307,9 +318,10 @@ static int cmd_add(int argc, char *argv[])
 	/* add in linked list */
 	svc->next = svcs;
 	svcs = svc;
-	mylog(LOG_INFO, "start '%s'", *svc->argv);
+	mylog(LOG_INFO, "%s '%s'", svc->pid ? "import" : "add", *svc->argv);
 	/* exec now */
-	exec_svc(svc);
+	if (!svc->pid)
+		exec_svc(svc);
 	return svc->pid;
 failed:
 	if (svc->args) {
