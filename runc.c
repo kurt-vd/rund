@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <poll.h>
+#include <pwd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -168,6 +169,22 @@ int main(int argc, char *argv[])
 	}
 
 	for (j = optind, bufp = sbuf; j < argc; ++j) {
+		if (!strncmp("USER=", argv[j], 5) && argv[j][5] != '#') {
+			/* translate users to ID, and relieve pid 1 from
+			 * doing (possible time consuming over LDAP)
+			 * user name lookups
+			 */
+			struct passwd *pw;
+
+			pw = getpwnam(argv[j]+5);
+			if (!pw)
+				mylog(LOG_ERR, "user '%s' unknown", argv[j]+5);
+			/* add the argument manually
+			 * don't forget to add null terminator
+			 */
+			bufp += sprintf(bufp, "USER=#%u", pw->pw_uid)+1;
+			continue;
+		}
 		strcpy(bufp, argv[j]);
 		bufp += strlen(bufp)+1;
 	}

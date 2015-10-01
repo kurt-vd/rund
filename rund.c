@@ -259,16 +259,17 @@ static int cmd_add(int argc, char *argv[])
 	for (f = j = 0; j < argc; ++j) {
 		if (!svc->argv && !strncmp("USER=", argv[j], 5)) {
 			/* still in environment, and user provided */
-			struct passwd *pw;
-
 			if (argv[j][5] == '#') {
 				svc->uid = strtoul(argv[j]+6, NULL, 0);
-			} else if ((pw = getpwnam(argv[j]+5)) == NULL) {
-				result = -EINVAL;
-				mylog(LOG_WARNING, "user '%s' unknown", argv[j]+5);
-				goto failed;
 			} else {
-				svc->uid = pw->pw_uid;
+				/* do not perform user name lookups
+				 * in pid 1. It may involve LDAP queries etc.
+				 * Leave this 'runtime dependency' to runc
+				 * or any other client
+				 */
+				result = -EINVAL;
+				mylog(LOG_WARNING, "only USER=#xx format accepted");
+				goto failed;
 			}
 			if (peeruid && (svc->uid != peeruid)) {
 				result = -EPERM;
