@@ -103,7 +103,7 @@ static void do_watchdog(void *dat)
 {
 	struct wdt *wdt = dat;
 
-	write(wdt->fd, "w", 1);
+	write(wdt->fd, "keepalive", 9);
 	libt_add_timeout(wdt->timeout/2.0, do_watchdog, wdt);
 }
 
