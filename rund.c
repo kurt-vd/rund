@@ -138,7 +138,7 @@ static int cmd_watchdog(int argc, char *argv[])
 	}
 	/* set timeout */
 	ret = ioctl(wdt->fd, WDIOC_SETTIMEOUT, &wdt->timeout);
-	if (ret < 0) {
+	if (ret < 0 && errno != ENOTSUP) {
 		mylog(LOG_ERR, "ioctl %s settimeout %i: %s", argv[1],
 				wdt->timeout, ESTR(errno));
 		close(wdt->fd);
