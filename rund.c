@@ -62,6 +62,31 @@ static int peeruid;
 static int myuid;
 static sigset_t savedset;
 
+/* stdin initially is /dev/console
+ * I want to redirect it to /dev/null,
+ * when I start spawning services.
+ * The redirect is seperated from main
+ * so I can postpone this until the first
+ * service spawns. This relieves the rootfs
+ * to have /dev/null at boot time.
+ * You can mount /dev and create it later,
+ * just before the first service starts.
+ */
+static int nullin; /* stdin is already /dev/null */
+static void set_nullin(void)
+{
+	int fd;
+
+	fd = open("/dev/null", O_RDWR);
+	if (fd < 0)
+		mylog(LOG_WARNING, "open %s: %s", "/dev/null", ESTR(errno));
+	else {
+		dup2(fd, STDIN_FILENO);
+		close(fd);
+		nullin = 1;
+	}
+}
+
 static int parse_nullbuff(char *buf, int len, char **pargv[])
 {
 	static char **argv;
@@ -200,6 +225,8 @@ static void exec_svc(void *dat)
 	struct service *svc = dat;
 	int ret, j;
 
+	if (!nullin)
+		set_nullin();
 	if (svc->delay[1])
 		/* this service has been throttled */
 		mylog(LOG_INFO, "resume %s", *svc->argv);
@@ -590,7 +617,7 @@ struct cmd {
 /* main process */
 int main(int argc, char *argv[])
 {
-	int ret, fd;
+	int ret;
 	struct service *svc;
 	pid_t rcpid, pid;
 	struct pollfd fset[] = {
@@ -636,13 +663,6 @@ int main(int argc, char *argv[])
 	}
 	myuid = getuid();
 	chdir("/");
-	fd = open("/dev/null", O_RDWR);
-	if (fd < 0)
-		mylog(LOG_WARNING, "open %s: %s", "/dev/null", ESTR(errno));
-	else {
-		dup2(fd, STDIN_FILENO);
-		close(fd);
-	}
 	/* setup signals */
 	sigfillset(&set);
 	sigprocmask(SIG_BLOCK, &set, &savedset);
