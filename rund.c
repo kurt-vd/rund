@@ -12,11 +12,13 @@
 #include <grp.h>
 #include <poll.h>
 #include <syslog.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/signalfd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <linux/watchdog.h>
 
 #include "lib/libt.h"
 
@@ -109,6 +111,7 @@ static void do_watchdog(void *dat)
 static int cmd_watchdog(int argc, char *argv[])
 {
 	struct wdt *wdt;
+	int ret;
 
 	if (argc < 2) {
 		mylog(LOG_WARNING, "no watchdog device given");
@@ -119,13 +122,28 @@ static int cmd_watchdog(int argc, char *argv[])
 		mylog(LOG_ERR, "malloc failed: %s", ESTR(errno));
 		return -errno;
 	}
+	wdt->timeout = strtoul(argv[2] ?: "5", NULL, 0);
+	if (!wdt->timeout) {
+		mylog(LOG_ERR, "illegal watchdog timeout %i: %s",
+				wdt->timeout, ESTR(errno));
+		free(wdt);
+		return -EINVAL;
+	}
 	wdt->fd = open(argv[1], O_RDONLY);
 	if (wdt->fd < 0) {
 		free(wdt);
 		mylog(LOG_ERR, "open %s: %s", argv[1], ESTR(errno));
 		return -errno;
 	}
-	wdt->timeout = (argc > 2) ? (strtoul(argv[2], 0, 0) ?: 1) : 1;
+	/* set timeout */
+	ret = ioctl(wdt->fd, WDIOC_SETTIMEOUT, &wdt->timeout);
+	if (ret < 0) {
+		mylog(LOG_ERR, "ioctl %s settimeout %i: %s", argv[1],
+				wdt->timeout, ESTR(errno));
+		close(wdt->fd);
+		free(wdt);
+		return -errno;
+	}
 	/* save owner, for later removal authorization */
 	wdt->owner = peeruid;
 	/* add in linked list */
