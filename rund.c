@@ -95,7 +95,6 @@ struct wdt {
 	struct wdt *next;
 	int fd;
 	int timeout;
-	int owner;
 	char file[2];
 };
 static struct wdt *wdts;
@@ -113,6 +112,8 @@ static int cmd_watchdog(int argc, char *argv[])
 	struct wdt *wdt;
 	int ret;
 
+	if (peeruid)
+		return -EPERM;
 	if (argc < 2) {
 		mylog(LOG_WARNING, "no watchdog device given");
 		return -EINVAL;
@@ -144,8 +145,6 @@ static int cmd_watchdog(int argc, char *argv[])
 		free(wdt);
 		return -errno;
 	}
-	/* save owner, for later removal authorization */
-	wdt->owner = peeruid;
 	/* add in linked list */
 	wdt->next = wdts;
 	wdts = wdt;
@@ -158,6 +157,8 @@ static int cmd_unwatchdog(int argc, char *argv[])
 {
 	struct wdt **pwdt, *wdt;
 
+	if (peeruid)
+		return -EPERM;
 	if (argc < 2) {
 		mylog(LOG_WARNING, "no watchdog device given");
 		return -EINVAL;
@@ -165,10 +166,6 @@ static int cmd_unwatchdog(int argc, char *argv[])
 	for (pwdt = &wdts; *pwdt; pwdt = &(*pwdt)->next) {
 		if (!strcmp((*pwdt)->file, argv[1])) {
 			wdt = *pwdt;
-			if (peeruid && (wdt->owner != peeruid)) {
-				mylog(LOG_ERR, "remove %s: %s", argv[1], ESTR(EPERM));
-				return -EPERM;
-			}
 			/* remove from linked list */
 			*pwdt = (*pwdt)->next;
 			libt_remove_timeout(do_watchdog, wdt);
