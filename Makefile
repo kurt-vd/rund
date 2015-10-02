@@ -22,7 +22,7 @@ clean:
 
 install: $(PROGS)
 	@[ -d $(DESTDIR)$(PREFIX)/sbin ] || install -v -d $(DESTDIR)$(PREFIX)/sbin
-	@install -v rund $(DESTDIR)$(PREFIX)/sbin
+	@install -v rund sysreboot $(DESTDIR)$(PREFIX)/sbin
 	@[ -d $(DESTDIR)$(PREFIX)/bin ] || install -v -d $(DESTDIR)$(PREFIX)/bin
-	@install -v $(filter-out rund, $^) $(DESTDIR)$(PREFIX)/bin
+	@install -v $(filter-out rund sysreboot, $^) $(DESTDIR)$(PREFIX)/bin
 
