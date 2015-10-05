@@ -134,37 +134,55 @@ static void do_watchdog(void *dat)
 
 static int cmd_watchdog(int argc, char *argv[])
 {
-	struct wdt *wdt;
+	struct wdt *wdt, **pwdt;
 	int ret;
+	const char *device;
 
 	if (peeruid)
 		return -EPERM;
-	if (argc < 2) {
+	if (argc < 3) {
 		mylog(LOG_WARNING, "no watchdog device given");
 		return -EINVAL;
 	}
-	wdt = malloc(sizeof(*wdt)+strlen(argv[1]));
+	device = argv[2];
+
+	if (!strcmp(argv[1], "remove")) {
+		for (pwdt = &wdts; *pwdt; pwdt = &(*pwdt)->next) {
+			if (!strcmp((*pwdt)->file, device)) {
+				wdt = *pwdt;
+				/* remove from linked list */
+				*pwdt = (*pwdt)->next;
+				libt_remove_timeout(do_watchdog, wdt);
+				close(wdt->fd);
+				free(wdt);
+				return 0;
+			}
+		}
+		return -ENOENT;
+	}
+	/* add a watchdog */
+	wdt = malloc(sizeof(*wdt)+strlen(device));
 	if (!wdt) {
 		mylog(LOG_ERR, "malloc failed: %s", ESTR(errno));
 		return -errno;
 	}
-	wdt->timeout = strtoul(argv[2] ?: "5", NULL, 0);
+	wdt->timeout = strtoul(argv[3] ?: "5", NULL, 0);
 	if (!wdt->timeout) {
 		mylog(LOG_ERR, "illegal watchdog timeout %i: %s",
 				wdt->timeout, ESTR(errno));
 		free(wdt);
 		return -EINVAL;
 	}
-	wdt->fd = open(argv[1], O_RDWR);
+	wdt->fd = open(device, O_RDWR);
 	if (wdt->fd < 0) {
 		free(wdt);
-		mylog(LOG_ERR, "open %s: %s", argv[1], ESTR(errno));
+		mylog(LOG_ERR, "open %s: %s", device, ESTR(errno));
 		return -errno;
 	}
 	/* set timeout */
 	ret = ioctl(wdt->fd, WDIOC_SETTIMEOUT, &wdt->timeout);
 	if (ret < 0 && errno != ENOTSUP) {
-		mylog(LOG_ERR, "ioctl %s settimeout %i: %s", argv[1],
+		mylog(LOG_ERR, "ioctl %s settimeout %i: %s", device,
 				wdt->timeout, ESTR(errno));
 		close(wdt->fd);
 		free(wdt);
@@ -176,30 +194,6 @@ static int cmd_watchdog(int argc, char *argv[])
 	/* first trigger + schedule next */
 	do_watchdog(wdt);
 	return 0;
-}
-
-static int cmd_unwatchdog(int argc, char *argv[])
-{
-	struct wdt **pwdt, *wdt;
-
-	if (peeruid)
-		return -EPERM;
-	if (argc < 2) {
-		mylog(LOG_WARNING, "no watchdog device given");
-		return -EINVAL;
-	}
-	for (pwdt = &wdts; *pwdt; pwdt = &(*pwdt)->next) {
-		if (!strcmp((*pwdt)->file, argv[1])) {
-			wdt = *pwdt;
-			/* remove from linked list */
-			*pwdt = (*pwdt)->next;
-			libt_remove_timeout(do_watchdog, wdt);
-			close(wdt->fd);
-			free(wdt);
-			return 0;
-		}
-	}
-	return -ENOENT;
 }
 
 /* exec control */
@@ -600,7 +594,6 @@ struct cmd {
 	int (*fn)(int argc, char *argv[]);
 } static const cmds[] = {
 	{ "watchdog", cmd_watchdog, },
-	{ "unwatchdog", cmd_unwatchdog, },
 	{ "add", cmd_add, },
 	{ "remove", cmd_remove, },
 	{ "removing", cmd_removing, },
