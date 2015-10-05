@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <poll.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -34,11 +35,12 @@ static const char help_msg[] =
 	" -rDELAY	Repeat command each DELAY secs (default 1.0)\n"
 	"		until 0 is returned\n"
 	" -d	DGRAM socket\n"
+	" -f	Wait on regular file (or directory or symlink ...)\n"
 	" -n	Return when socket is remotely closed\n"
 	"	Consumes all received data\n"
 	" -F	Use non-full length for abstract sockets\n"
 	;
-static const char optstring[] = "?Vr:dnF";
+static const char optstring[] = "?Vr:dfnF";
 
 /* main process */
 int main(int argc, char *argv[])
@@ -70,6 +72,9 @@ int main(int argc, char *argv[])
 	case 'd':
 		socktype = SOCK_DGRAM;
 		break;
+	case 'f':
+		socktype = -1;
+		break;
 	case 'n':
 		flags |= FL_WAITCLOSE;
 		break;
@@ -91,6 +96,20 @@ int main(int argc, char *argv[])
 	}
 	if ((socktype != SOCK_STREAM) && (flags & FL_WAITCLOSE))
 		mylog(LOG_ERR, "-n is only possible for STREAM sockets");
+
+	while (socktype == -1) {
+		/* wait on file */
+		struct stat st;
+
+		if (0 == stat(argv[optind], &st)) {
+			if (!(flags & FL_WAITCLOSE))
+				return 0;
+		} else if (errno == ENOENT) {
+			if (flags & FL_WAITCLOSE)
+				return 0;
+		}
+		usleep(repeat*1000000);
+	}
 
 	strncpy(name.sun_path, argv[optind], sizeof(name.sun_path));
 	socklen = sizeof(name.sun_family) + strlen(name.sun_path);
