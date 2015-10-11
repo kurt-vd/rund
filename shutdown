@@ -25,4 +25,14 @@ systemd)
 busybox)
 	/bin/busybox "$ACTION" "$@"
 	;;
+sysvinit)
+	case "$ACTION" in
+	halt|reboot|poweroff)
+		/sbin/halt.sysvinit "$@"
+		;;
+	shutdown)
+		/sbin/shutdown.sysvinit "$@"
+		;;
+	esac
+	;;
 esac
