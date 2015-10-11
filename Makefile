@@ -20,9 +20,9 @@ runc: LDLIBS+= -lm
 clean:
 	rm -rf $(PROGS) $(wildcard *.o lib/*.o)
 
-install: $(PROGS)
+install: $(PROGS) shutdown
 	@[ -d $(DESTDIR)$(PREFIX)/sbin ] || install -v -d $(DESTDIR)$(PREFIX)/sbin
-	@install -v rund sysreboot $(DESTDIR)$(PREFIX)/sbin
+	@install -v rund sysreboot shutdown $(DESTDIR)$(PREFIX)/sbin
 	@[ -d $(DESTDIR)$(PREFIX)/bin ] || install -v -d $(DESTDIR)$(PREFIX)/bin
-	@install -v $(filter-out rund sysreboot, $^) $(DESTDIR)$(PREFIX)/bin
+	@install -v $(filter-out rund sysreboot shutdown, $^) $(DESTDIR)$(PREFIX)/bin
 

@@ -1,0 +1,28 @@
+#!/bin/sh
+
+INITPATH=`readlink -f /proc/1/exe`
+INITBIN=`basename "$INITPATH"`
+ACTION=`basename "$0"`
+
+case "$INITBIN" in
+rund)
+	# TODO: write utmp
+	case "$ACTION" in
+	*halt)
+		exec kill -USR1 1
+		;;
+	*reboot)
+		exec kill -INT 1
+		;;
+	*poweroff|*shutdown)
+		exec kill -TERM 1
+		;;
+	esac
+	;;
+systemd)
+	/bin/systemctl $ACTION "$@"
+	;;	
+busybox)
+	/bin/busybox "$ACTION" "$@"
+	;;
+esac
