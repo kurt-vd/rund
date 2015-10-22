@@ -173,7 +173,7 @@ static int cmd_watchdog(int argc, char *argv[])
 		free(wdt);
 		return -EINVAL;
 	}
-	wdt->fd = open(device, O_RDWR);
+	wdt->fd = open(device, O_RDWR | O_CLOEXEC);
 	if (wdt->fd < 0) {
 		free(wdt);
 		mylog(LOG_ERR, "open %s: %s", device, ESTR(errno));
