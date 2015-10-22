@@ -234,19 +234,23 @@ static void exec_svc(void *dat)
 		svc->starttime = libt_now();
 		svc->pid = ret;
 	} else {
+		sigprocmask(SIG_SETMASK, &savedset, NULL);
+		setsid();
+		for (j = 0; j < svc->argv-svc->args; ++j)
+			putenv(svc->args[j]);
+
 		/* child */
 		/* redirect stdout & stderr to /dev/null
 		 * We know stdin is /dev/null.
 		 * stdout & stderr still default to /dev/console
 		 * and may have been redirected,
+		 * Prevent redirect with environment DETACH=0
 		 */
-		dup2(STDIN_FILENO, STDOUT_FILENO);
-		dup2(STDIN_FILENO, STDERR_FILENO);
+		if (strcmp(getenv("DETACH") ?: "1", "0")) {
+			dup2(STDIN_FILENO, STDOUT_FILENO);
+			dup2(STDIN_FILENO, STDERR_FILENO);
+		}
 
-		sigprocmask(SIG_SETMASK, &savedset, NULL);
-		setsid();
-		for (j = 0; j < svc->argv-svc->args; ++j)
-			putenv(svc->args[j]);
 		/* only try to set user when I'm root */
 		if (!myuid && svc->uid) {
 			/* change user */
