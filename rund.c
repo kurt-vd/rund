@@ -318,7 +318,7 @@ static int cmd_add(int argc, char *argv[])
 			}
 			continue;
 		} else if (!svc->argv && !strncmp("INTERVAL=", argv[j], 9)) {
-			svc->interval = strtod(argv[j], NULL);
+			svc->interval = strtod(argv[j]+9, NULL);
 			svc->flags |= FL_INTERVAL;
 			continue;
 		} else if (!strncmp("PID=", argv[j], 4)) {
