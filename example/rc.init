@@ -82,9 +82,9 @@ mount nodev /run -t tmpfs
 wait
 # READY
 
-# you could spawn all S* scripts in /etc/run.d parallel
-#echo "[`ktstamp`] Start /etc/run.d/ ..."
-#for FILE in /etc/run.d/S*; do
+# you could spawn all S* scripts in /etc/rc.local.d parallel
+#echo "[`ktstamp`] Start /etc/rc.local.d/ ..."
+#for FILE in /etc/rc.local.d/S*; do
 #	$FILE start &
 #done
 #
