@@ -9,6 +9,9 @@ halt|reboot|poweroff)
 	;;
 esac
 
+# Set linefeed mode to avoid staircase effect
+echo; /bin/stty onlcr
+
 echo [`ktstamp -k`] Shutdown ...
 echo [`ktstamp -k`] Save system clock
 hwclock -wu
