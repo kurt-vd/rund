@@ -276,6 +276,25 @@ static void exec_svc(void *dat)
 	}
 }
 
+static int svc_exist(struct service *dut)
+{
+	struct service *svc;
+	int j;
+
+	for (svc = svcs; svc; svc = svc->next) {
+		if (svc->uid != dut->uid)
+			continue;
+
+		for (j = 0; svc->args[j] && dut->args[j]; ++j) {
+			if (strcmp(svc->args[j], dut->args[j]))
+				break;
+		}
+		if (!svc->args[j] && !dut->args[j])
+			return 1;
+	}
+	return 0;
+}
+
 static int cmd_add(int argc, char *argv[])
 {
 	struct service *svc, *svc2;
@@ -355,6 +374,10 @@ static int cmd_add(int argc, char *argv[])
 	svc->args[f] = NULL;
 	if (!svc->argv)
 		svc->argv = svc->args;
+	if (svc_exist(svc)) {
+		result = -EEXIST;
+		goto failed;
+	}
 
 	/* add in linked list */
 	svc->next = svcs;
