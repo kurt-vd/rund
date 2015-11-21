@@ -8,6 +8,7 @@
 #include <time.h>
 
 #include <unistd.h>
+#include <fcntl.h>
 #include <getopt.h>
 #include <poll.h>
 #include <pwd.h>
@@ -112,15 +113,14 @@ static int sendcred(int sock, const void *dat, unsigned int len, int flags)
 
 static int ttytest(void)
 {
-	char lbuf[64];
-	if (isatty(STDERR_FILENO) <= 0)
-		return 0;
+	int fd;
 
-	if (readlink("/proc/self/fd/2", lbuf, sizeof(lbuf)) < 0)
-		return 0;
-	if (!strcmp("/dev/console", lbuf))
-		return 0;
-	return 1;
+	fd = open("/dev/tty", O_RDWR);
+	close(fd);
+	/* /dev/tty can only open when a controlling terminal is opened,
+	 * /dev/console is not one of them
+	 */
+	return fd >= 0;
 }
 
 /* main process */
