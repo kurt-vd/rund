@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
 	int ret, ctl;
 
 	if (!argv[1])
-		ctl = 0;
+		goto help;
 	else if (!strcmp("halt", argv[1]))
 		ctl = RB_HALT_SYSTEM;
 	else if (!strcmp("reboot", argv[1]))
@@ -37,16 +37,15 @@ int main(int argc, char *argv[])
 	else if (!strcmp("cadsoft", argv[1]))
 		ctl = RB_DISABLE_CAD;
 	else
-		ctl = 0;
+		goto help;
 
-	if (!ctl) {
-		fputs(helpmsg, stderr);
-		exit(2);
-	}
 	ret = reboot(ctl);
 	if (ret < 0) {
 		fprintf(stderr, "reboot %s: %s\n", argv[1], strerror(errno));
 		return 1;
 	}
 	return 0;
+help:
+	fputs(helpmsg, stderr);
+	exit(2);
 }
