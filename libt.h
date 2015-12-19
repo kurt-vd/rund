@@ -39,6 +39,12 @@ extern void libt_repeat_timeout(double increment, void (*fn)(void *), const void
  */
 extern void libt_remove_timeout(void (*fn)(void *), const void *dat);
 
+/* return true if a timeout with given properties is currently scheduled
+ * This API is not necessary for strict timeout keeping
+ * but may be usefull to re-use the timeout presence as state.
+ */
+extern int libt_timeout_exist(void (*fn)(void *), const void *dat);
+
 /* run callbacks for all timouts that have passed now */
 extern int libt_flush(void);
 

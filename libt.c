@@ -172,6 +172,11 @@ void libt_remove_timeout(void (*fn)(void *), const void *dat)
 	}
 }
 
+int libt_timeout_exist(void (*fn)(void *), const void *dat)
+{
+	return !!t_find(fn, dat);
+}
+
 int libt_flush(void)
 {
 	struct timer *t;
