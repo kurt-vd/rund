@@ -12,7 +12,7 @@ CPPFLAGS+= -DVERSION=\"$(LOCALVERSION)\"
 
 .PHONY: clean install
 
-rund: LDLIBS+= -lrt
+rund: LDLIBS+= -lrt -lm
 rund: lib/libt.o
 
 runc: LDLIBS+= -lm
