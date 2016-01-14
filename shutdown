@@ -1,6 +1,12 @@
 #!/bin/sh
 
 INITPATH=`readlink -f /proc/1/exe`
+if [ -z "$INITPATH" ]; then
+	# this occurs when the binary has been overwritten.
+	# no better way than to try /sbin/init
+	# which is not necessarily the best thing to do
+	INITPATH=`readlink -f /sbin/init`
+fi
 INITBIN=`basename "$INITPATH"`
 ACTION=`basename "$0"`
 
