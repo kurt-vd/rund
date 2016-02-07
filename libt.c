@@ -225,7 +225,14 @@ int libt_get_waittime(void)
 	 * because the waittime is wrong.
 	 */
 	tmp = (s.timers->wakeup - libt_now()) * 1000;
-	return (tmp < 0) ? 0 : tmp;
+	/* compute the max result value that we want to return.
+	 * This is 1/4 of the maximum int value
+	 */
+#define MAXRESULT	((~0U)/4)
+	if ((tmp < 0) || (tmp > MAXRESULT))
+		return MAXRESULT;
+	else
+		return tmp;
 }
 
 /* cleanup storage */
