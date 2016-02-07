@@ -213,10 +213,17 @@ double libt_next_wakeup(void)
 
 int libt_get_waittime(void)
 {
-	int tmp;
+	double tmp;
 
 	if (!s.timers)
 		return -1;
+	/* avoid integer overflows and use double
+	 * An integer overflow may result into a negative
+	 * waittime, while nothing is about to happen.
+	 * The net result is that the program using
+	 * libt_get_waittime() for poll() runs away with the cpu
+	 * because the waittime is wrong.
+	 */
 	tmp = (s.timers->wakeup - libt_now()) * 1000;
 	return (tmp < 0) ? 0 : tmp;
 }
