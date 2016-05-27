@@ -13,7 +13,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#define NAME "runc"
+#define NAME "sockwait"
 
 #define LOG_ERR	1
 #define mylog(level, fmt, ...) \
@@ -132,14 +132,14 @@ int main(int argc, char *argv[])
 			/* done */
 			return 0;
 		if (errno != ECONNREFUSED)
-			mylog(LOG_ERR, "connect failed: %s", ESTR(errno));
+			mylog(LOG_ERR, "connect(%c%s) failed: %s", name.sun_path[0] ?: '@', &name.sun_path[1], ESTR(errno));
 		poll(NULL, 0, repeat*1000);
 	}
 
 	/* waitclose */
 	ret = connect(sock, (void *)&name, socklen);
 	if (ret < 0)
-		mylog(LOG_ERR, "connect failed: %s", ESTR(errno));
+		mylog(LOG_ERR, "connect(%c%s) failed: %s", name.sun_path[0] ?: '@', &name.sun_path[1], ESTR(errno));
 
 	while (1) {
 		ret = recv(sock, rbuf, sizeof(rbuf), 0);
