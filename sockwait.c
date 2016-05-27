@@ -131,7 +131,7 @@ int main(int argc, char *argv[])
 		if (ret >= 0)
 			/* done */
 			return 0;
-		if (errno != ECONNREFUSED)
+		if (errno != ECONNREFUSED && errno != ENOENT)
 			mylog(LOG_ERR, "connect(%c%s) failed: %s", name.sun_path[0] ?: '@', &name.sun_path[1], ESTR(errno));
 		poll(NULL, 0, repeat*1000);
 	}
