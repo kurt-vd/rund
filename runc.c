@@ -211,7 +211,7 @@ int main(int argc, char *argv[])
 	sprintf(str, "-%i", getpid());
 	ret = bind(sock, (void *)&name, sizeof(name));
 	if (ret < 0)
-		mylog(LOG_ERR, "connect(@%s) failed: %s", name.sun_path+1, ESTR(errno));
+		mylog(LOG_ERR, "bind(@%s) failed: %s", name.sun_path+1, ESTR(errno));
 
 	t0 = time(NULL);
 	do {
