@@ -229,7 +229,9 @@ int libt_get_waittime(void)
 	 * This is 1/4 of the maximum int value
 	 */
 #define MAXRESULT	((~0U)/4)
-	if ((tmp < 0) || (tmp > MAXRESULT))
+	if (tmp <= 0)
+		return 0;
+	if (tmp > MAXRESULT)
 		return MAXRESULT;
 	else
 		return tmp;
