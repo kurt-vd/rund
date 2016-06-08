@@ -2,6 +2,22 @@
 
 This is (yet another) init daemon, initially based on sinit[1][1].
 
+rund merges the best of 2 init approaches.
+rund itself is an init daemon that only supervises services.
+The boot process is offloaded to an external bootscript.
+This bootscript or any other process can ask rund to
+run+supervise processes.
+The configuration of the boot process is reduced to shell script,
+or any other program of your choice.
+Yet, complex constructs for service selection
+remain possible.
+
+Spawning services in parallel during boot is easily done
+with backgrounding parts of the script, a technique that existed
+for years.
+
+--
+
 _sinit_ restricts itself to reaping children,
 and spawning an _init_ & _shutdown_ script.
 I liked the idea very much.
