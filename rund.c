@@ -166,6 +166,7 @@ static int cmd_watchdog(int argc, char *argv[])
 		mylog(LOG_ERR, "malloc failed: %s", ESTR(errno));
 		return -errno;
 	}
+	strcpy(wdt->file, device);
 	wdt->timeout = strtoul(argv[3] ?: "5", NULL, 0);
 	if (!wdt->timeout) {
 		mylog(LOG_ERR, "illegal watchdog timeout %i: %s",
