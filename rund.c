@@ -153,6 +153,8 @@ static int cmd_watchdog(int argc, char *argv[])
 				/* remove from linked list */
 				*pwdt = (*pwdt)->next;
 				libt_remove_timeout(do_watchdog, wdt);
+				/* clean exit */
+				write(wdt->fd, "V", 1);
 				close(wdt->fd);
 				free(wdt);
 				return 0;
