@@ -57,6 +57,7 @@ static const char help_msg[] =
 	"	Remove all services\n"
 	" removing [KEY=VALUE ...] [PROGRAM] [ARGUMENT ...]\n"
 	"	Count the number of removed services that are yet exiting\n"
+	" reload [KEY=VALUE ...] [PRORAM] [ARGUMENT ...]\n"
 	" syslog\n"
 	" loglevel\n"
 	" redir\n"

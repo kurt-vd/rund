@@ -491,6 +491,28 @@ static int cmd_removing(int argc, char *argv[])
 	return ndone;
 }
 
+static int cmd_reload(int argc, char *argv[])
+{
+	struct service *svc;
+	int ndone = 0, err = 0;
+
+	for (svc = find_svc(svcs, argv); svc; svc = find_svc(svc->next, argv)) {
+		if (peeruid && (svc->uid != peeruid)) {
+			/* change returned error into 'permission ...' */
+			err = EPERM;
+			continue;
+		}
+		if (!svc->pid && (svc->delay[1] ||
+			(svc->flags & FL_INTERVAL))) {
+			/* re-schedule immediate */
+			libt_remove_timeout(exec_svc, svc);
+			libt_add_timeout(0, exec_svc, svc);
+			++ndone;
+		}
+	}
+	return ndone ?: -err;
+}
+
 static int cmd_syslog(int argc, char *argv[])
 {
 	if (myuid != (peeruid ?: myuid))
@@ -627,6 +649,7 @@ struct cmd {
 	{ "add", cmd_add, },
 	{ "remove", cmd_remove, },
 	{ "removing", cmd_removing, },
+	{ "reload", cmd_reload, },
 	/* management commands */
 	{ "syslog", cmd_syslog, },
 	{ "loglevel", cmd_loglevel, },
