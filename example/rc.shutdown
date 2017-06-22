@@ -20,8 +20,8 @@ echo [`ktstamp -k`] Store random seed
 dd if=/dev/urandom of=/var/cache/random-seed iflag=nonblock count=1 bs=512 2>/dev/null &
 
 echo [`ktstamp -k`] Kill services
-runc remove "*"
-runc -r0.25 -m10 removing
+runcl remove "*"
+runcl -r0.25 -m10 removing
 
 echo [`ktstamp -k`] Kill remaining processes
 
@@ -39,7 +39,7 @@ if ! mount -o remount,ro /; then
 	# maybe pid #1 has files open that were replaced/deleted
 	# exec itself to solve this
 	echo [`ktstamp -k`] exec rund to release rootfs
-	runc exec rund -noinit
+	runcl exec rund -noinit
 	echo [`ktstamp -k`] Remount root as read-only
 	if ! mount -o remount,ro /; then
 		echo [`ktstamp -k`] / did not remount cleanly

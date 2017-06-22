@@ -16,7 +16,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-#define NAME "runc"
+#define NAME "runcl"
 
 #define LOG_ERR	1
 #define LOG_INFO 3
