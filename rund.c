@@ -206,6 +206,7 @@ struct service {
 	int flags;
 		#define FL_REMOVE	0x01
 		#define FL_INTERVAL	0x02
+		#define FL_PAUSED	0x04
 	double starttime;
 	int delay[2]; /* create fibonacci on the fly */
 	char **args;
@@ -366,7 +367,10 @@ static int cmd_add(int argc, char *argv[])
 			}
 			/* test process exists */
 			if (kill(svc->pid, 0) < 0)
-				svc->pid =0 ;
+				svc->pid = 0;
+			continue;
+		} else if (!strcmp("PAUSED=1", argv[j])) {
+			svc->flags |= FL_PAUSED;
 			continue;
 		}
 		svc->args[f] = strdup(argv[j]);
@@ -513,6 +517,37 @@ static int cmd_reload(int argc, char *argv[])
 	return ndone ?: -err;
 }
 
+static int cmd_pause(int argc, char *argv[])
+{
+	struct service *svc;
+	int ndone = 0, err = 0;
+	int pause = strcmp("resume", argv[0]) != 0;
+
+	for (svc = find_svc(svcs, argv); svc; svc = find_svc(svc->next, argv)) {
+		if (peeruid && (svc->uid != peeruid)) {
+			/* change returned error into 'permission ...' */
+			err = EPERM;
+			continue;
+		}
+		if (pause && !(svc->flags & FL_PAUSED)) {
+			mylog(LOG_INFO, "pause '%s'", *svc->argv);
+			svc->flags |= FL_PAUSED;
+			libt_remove_timeout(exec_svc, svc);
+			if (svc->pid) {
+				mylog(LOG_INFO, "stop '%s'", *svc->argv);
+				kill(svc->pid, SIGTERM);
+			}
+			++ndone;
+		} else if (!pause && (svc->flags & FL_PAUSED) && !svc->pid) {
+			svc->flags &= ~FL_PAUSED;
+			libt_add_timeout(0, exec_svc, svc);
+			++ndone;
+			mylog(LOG_INFO, "unpause '%s'", *svc->argv);
+		}
+	}
+	return ndone ?: -err;
+}
+
 static int cmd_syslog(int argc, char *argv[])
 {
 	if (myuid != (peeruid ?: myuid))
@@ -611,6 +646,8 @@ static int cmd_status(int argc, char *argv[])
 			bufp += sprintf(bufp, "USER=#%u", svc->uid) +1;
 		if (svc->flags & FL_INTERVAL)
 			bufp += sprintf(bufp, "INTERVAL=%lf", svc->interval) +1;
+		if (svc->flags & FL_PAUSED)
+			bufp += sprintf(bufp, "PAUSED=1") +1;
 		for (j = 0; svc->args[j]; ++j) {
 			strcpy(bufp, svc->args[j]);
 			bufp += strlen(bufp)+1;
@@ -650,6 +687,9 @@ struct cmd {
 	{ "remove", cmd_remove, },
 	{ "removing", cmd_removing, },
 	{ "reload", cmd_reload, },
+	{ "pause", cmd_pause, },
+	{ "suspend", cmd_pause, },
+	{ "resume", cmd_pause, },
 	/* management commands */
 	{ "syslog", cmd_syslog, },
 	{ "loglevel", cmd_loglevel, },
@@ -780,6 +820,8 @@ int main(int argc, char *argv[])
 							cleanup_svc(svc);
 							break;
 						}
+						if (svc->flags & FL_PAUSED)
+							break;
 						if (svc->flags & FL_INTERVAL) {
 							libt_add_timeout(svc->interval, exec_svc, svc);
 						} else if ((svc->starttime + 2) < libt_now()) {
