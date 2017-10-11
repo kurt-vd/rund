@@ -637,9 +637,35 @@ static char sbuf[16*1024];
 static int cmd_status(int argc, char *argv[])
 {
 	struct service *svc;
+	struct wdt *wdt;
 	int ndone = 0, err = 0, j, ret;
 	char *bufp;
+	char *options = "s";
 
+	if (argv[1] && *argv[1] == '-') {
+		options = argv[1];
+		++argv;
+	}
+	if (strpbrk(options ?: "", "aw"))
+	/* add watchdogs */
+	for (wdt = wdts; wdt; wdt = wdt->next) {
+		bufp = sbuf;
+		*bufp++ = '>';
+		if (strchr(options, 'd')) {
+			bufp += sprintf(bufp, "watchdog") +1;
+			bufp += sprintf(bufp, "add") +1;
+		}
+		strcpy(bufp, wdt->file);
+		bufp += strlen(bufp)+1;
+		bufp += sprintf(bufp, "%i", wdt->timeout) +1;
+		ret = sendto(sock, sbuf, bufp-sbuf, 0, (void *)&peername, peernamelen);
+		if (ret < 0)
+			return -errno;
+		++ndone;
+	}
+
+	if (strpbrk(options, "as"))
+	/* add services */
 	for (svc = find_svc(svcs, argv+1); svc; svc = find_svc(svc->next, argv+1)) {
 		if (peeruid && (svc->uid != peeruid)) {
 			/* change returned error into 'permission ...' */
@@ -648,6 +674,8 @@ static int cmd_status(int argc, char *argv[])
 		}
 		bufp = sbuf;
 		*bufp++ = '>';
+		if (strchr(options, 'd'))
+			bufp += sprintf(bufp, "add") +1;
 		if (svc->pid)
 			bufp += sprintf(bufp, "PID=%u", svc->pid) +1;
 		if (svc->uid)
