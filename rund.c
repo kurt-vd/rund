@@ -523,6 +523,9 @@ static int cmd_pause(int argc, char *argv[])
 	int ndone = 0, err = 0;
 	int pause = strcmp("resume", argv[0]) != 0;
 
+	if (!argv[1])
+		/* do not 'implicitely' pause all svcs */
+		return -EINVAL;
 	for (svc = find_svc(svcs, argv); svc; svc = find_svc(svc->next, argv)) {
 		if (peeruid && (svc->uid != peeruid)) {
 			/* change returned error into 'permission ...' */
