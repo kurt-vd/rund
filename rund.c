@@ -434,14 +434,14 @@ static struct service *find_svc(struct service *svcs, char *args[])
 	struct service *svc;
 	int j, k;
 
-	if (!*args)
+	if (!args)
 		return NULL;
-	if (args[1] && !strcmp(args[1], "*"))
+	if (*args && !strcmp(*args, "*"))
 		/* wildcard matches all */
 		return svcs;
 
 	for (svc = svcs; svc; svc = svc->next) {
-		for (j = 1; args[j]; ++j) {
+		for (j = 0; args[j]; ++j) {
 			for (k = 0; svc->args[k]; ++k)
 				if (!strcmp(args[j], svc->args[k]))
 					break;
@@ -466,7 +466,7 @@ static int cmd_remove(int argc, char *argv[])
 	if (!argv[1])
 		/* do not 'implicitely' remove all svcs */
 		return -EINVAL;
-	for (svc = find_svc(svcs, argv); svc; svc = find_svc(nsvc, argv)) {
+	for (svc = find_svc(svcs, argv+1); svc; svc = find_svc(nsvc, argv+1)) {
 		nsvc = svc->next;
 		if (peeruid && (svc->uid != peeruid)) {
 			/* change returned error into 'permission ...' */
@@ -491,7 +491,7 @@ static int cmd_removing(int argc, char *argv[])
 	struct service *svc;
 	int ndone = 0;
 
-	for (svc = find_svc(svcs, argv); svc; svc = find_svc(svc->next, argv)) {
+	for (svc = find_svc(svcs, argv+1); svc; svc = find_svc(svc->next, argv+1)) {
 		if (peeruid && (svc->uid != peeruid))
 			continue;
 		if (svc->flags & FL_REMOVE)
@@ -505,7 +505,7 @@ static int cmd_reload(int argc, char *argv[])
 	struct service *svc;
 	int ndone = 0, err = 0;
 
-	for (svc = find_svc(svcs, argv); svc; svc = find_svc(svc->next, argv)) {
+	for (svc = find_svc(svcs, argv+1); svc; svc = find_svc(svc->next, argv+1)) {
 		if (peeruid && (svc->uid != peeruid)) {
 			/* change returned error into 'permission ...' */
 			err = EPERM;
@@ -531,7 +531,7 @@ static int cmd_pause(int argc, char *argv[])
 	if (!argv[1])
 		/* do not 'implicitely' pause all svcs */
 		return -EINVAL;
-	for (svc = find_svc(svcs, argv); svc; svc = find_svc(svc->next, argv)) {
+	for (svc = find_svc(svcs, argv+1); svc; svc = find_svc(svc->next, argv+1)) {
 		if (peeruid && (svc->uid != peeruid)) {
 			/* change returned error into 'permission ...' */
 			err = EPERM;
@@ -640,7 +640,7 @@ static int cmd_status(int argc, char *argv[])
 	int ndone = 0, err = 0, j, ret;
 	char *bufp;
 
-	for (svc = find_svc(svcs, argv); svc; svc = find_svc(svc->next, argv)) {
+	for (svc = find_svc(svcs, argv+1); svc; svc = find_svc(svc->next, argv+1)) {
 		if (peeruid && (svc->uid != peeruid)) {
 			/* change returned error into 'permission ...' */
 			err = EPERM;
