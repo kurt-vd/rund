@@ -12,13 +12,13 @@ function failed
 SVCS=/tmp/$$
 
 # save state
-runcl -q status > "$SVCS" || failed "Get current status"
+runcl -q status -ad > "$SVCS" || failed "Save current state"
 
 # exec new version
 runcl -q exec rund -noinit || failed "Exec new rund"
 
 # restore state
 while read ARGS; do
-	runcl -q add $ARGS || echo "WARN: import $ARGS failed"
+	runcl -q $ARGS || echo "FAILED: $ARGS"
 done < "$SVCS"
 exit 0
