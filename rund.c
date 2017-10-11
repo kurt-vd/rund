@@ -162,6 +162,11 @@ static int cmd_watchdog(int argc, char *argv[])
 		}
 		return -ENOENT;
 	}
+
+	if (strcmp(argv[1], "add")) {
+		mylog(LOG_WARNING, "unknown watchdog command '%s'", argv[1]);
+		return -EINVAL;
+	}
 	/* add a watchdog */
 	wdt = malloc(sizeof(*wdt)+strlen(device));
 	if (!wdt) {
