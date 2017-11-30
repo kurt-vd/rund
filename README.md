@@ -16,7 +16,7 @@ Spawning services in parallel during boot is easily done
 with backgrounding parts of the script, a technique that existed
 for years.
 
---
+---
 
 _sinit_[1] restricts itself to reaping children,
 and spawning an _init_ & _shutdown_ script.
@@ -27,18 +27,32 @@ The problem that _rund_ tries to solve is that the _init_ script
 may spawn services, like sshd, httpd, ..., but noone will restart
 the service if it fails.
 
-Does restarting services belong to init's job?
-
-* System startup becomes simpler if I make it so. That's why.
-* A service monitor that is not PID 1, does it monitor PID 1 as well?
-* The kernel only verifies that PID 1 does not exit, but does not verify
-  if it stalled ...
-* Having PID 1 be the supervisor is a trivial solution to most problem.
-* Keeping PID 1 minimal is the challenge.
-  [_sinit_][1] performs well here. _systemd_ clearly does not.
+How?
 
 _rund_ opens an anonymous unix datagram socket.
 Adding restartable services is done via the _runcl_ companion tool.
+
+Does restarting services belong to init's job?
+
+System startup becomes simpler if I make it so. That's why.
+
+Hum, why exactly?
+
+The service supervisor is the trivial candidate for servicing
+the system watchdogs, if any (rund does support multiple watchdogs).
+If _init_ is not the supervisor, then _init_ is not covered by
+a watchdog. Is _init_ moinitored then?
+
+On systems without watchdog, the problem also exists, but does not require
+a solution...
+
+How would the system react if _init_ stalled, and everything else
+runs fine?
+
+There is not universal good answer to the above questions, and that
+is the argument against a seperate supervisor.
+A system without the supervisor being _init_ is one without a supervisor
+at all. Use [sinit][1] in that case.
 
 __Why is this better?__
 
@@ -48,7 +62,7 @@ and is thus not predefined inside the init program.
 _rund_ is not statically configured. The lack of config files
 imply that they should never be reloaded. Have you ever tried modifying
 the behaviour of init on a readonly rootfs?
-The operator is in charge, and may choose to remove a service,
+With _rund_, the operator is in charge, and may choose to remove a service,
 add another service, without the need for configuration written to the rootfs.
 
 Dependancy based services require a big deal of knowledge, both from
