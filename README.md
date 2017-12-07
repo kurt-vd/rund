@@ -87,6 +87,23 @@ running commands in the shells background.
 The early system startup, which is the most error-prone with almost no parallelism,
 becomes as easy as shell script.
 
+Since _rund_ doesn't do much standalone, and services can be added in runtime,
+minimal user protection is necessary to protect against malicious users.
+_rund_ takes advantage of the uid/gid/pid checks that linux can do
+when using OOB data on unix sockets. This is really the simplest way.
+_rund_ does not, as pid 1, do user or group lookups. This is by design,
+to not add enormous .so files into pid1.
+name-to-id translations are performed by the client, _rund_ accepts
+only id's on its protocol.
+
+Since _rund_ must actively protect against user ids, it does deliver
+it's _run service_ to regular (non-root) users too. It does however execute
+such services as the requesting users, i.e. regular users cannot ask _rund_
+to run services with a different uid.
+
+This means that running a service becomes available to regular users.
+This implies less sudo abuse.
+
 __How is the system started then?__
 
 I add a bare version of my scripts in examples/
