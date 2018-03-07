@@ -49,6 +49,7 @@ static const char help_msg[] =
 	" add [KEY=VALUE ...] PROGRAM [ARGUMENT ...]\n"
 	"	Add a new service\n"
 	"	Special environment variables:\n"
+	"	NAME=	Specify label (default is to use PROGRAM)\n"
 	"	USER=	to run as different user\n"
 	"	INTERVAL=	to run with intervals\n"
 	"	PAUSED=1	to start suspended\n"

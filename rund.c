@@ -216,6 +216,7 @@ struct service {
 	int delay[2]; /* create fibonacci on the fly */
 	char **args;
 	char **argv;
+	char *name;
 	int uid;
 	double interval;
 };
@@ -232,7 +233,7 @@ static void exec_svc(void *dat)
 		set_nullin();
 	if (svc->delay[1])
 		/* this service has been throttled */
-		mylog(LOG_INFO, "resume %s", *svc->argv);
+		mylog(LOG_INFO, "resume %s", svc->name);
 
 	ret = fork();
 	if (ret < 0) {
@@ -280,7 +281,7 @@ static void exec_svc(void *dat)
 			setenv("USER", pw->pw_name, 1);
 		}
 		execvp(*svc->argv, svc->argv);
-		mylog(LOG_CRIT, "execvp %s: %s", *svc->argv, ESTR(errno));
+		mylog(LOG_CRIT, "execvp %s: %s", svc->name, ESTR(errno));
 		_exit(EXIT_FAILURE);
 	}
 }
@@ -379,8 +380,14 @@ static int cmd_add(int argc, char *argv[])
 			continue;
 		}
 		svc->args[f] = strdup(argv[j]);
-		if (!svc->argv && !strchr(svc->args[f], '='))
+		/* some additional processing */
+		if (!svc->argv && !strncmp("NAME=", svc->args[f], 5))
+			svc->name = svc->args[f]+5;
+		if (!svc->argv && !strchr(svc->args[f], '=')) {
 			svc->argv = svc->args+f;
+			if (!svc->name)
+				svc->name = *svc->argv;
+		}
 		++f;
 	}
 	svc->args[f] = NULL;
@@ -394,7 +401,7 @@ static int cmd_add(int argc, char *argv[])
 	/* add in linked list */
 	svc->next = svcs;
 	svcs = svc;
-	mylog(LOG_INFO, "%s '%s'", svc->pid ? "import" : "add", *svc->argv);
+	mylog(LOG_INFO, "%s '%s'", svc->pid ? "import" : "add", svc->name);
 	/* exec now */
 	if (!svc->pid)
 		exec_svc(svc);
@@ -414,7 +421,7 @@ static void cleanup_svc(struct service *svc)
 	struct service **psvc;
 	int j;
 
-	mylog(LOG_INFO, "remove '%s'", *svc->argv);
+	mylog(LOG_INFO, "remove '%s'", svc->name);
 	/* remove from linked list */
 	for (psvc = &svcs; *psvc; psvc = &(*psvc)->next) {
 		if (*psvc == svc) {
@@ -474,7 +481,7 @@ static int cmd_remove(int argc, char *argv[])
 			continue;
 		}
 		if (svc->pid) {
-			mylog(LOG_INFO, "stop '%s'", *svc->argv);
+			mylog(LOG_INFO, "stop '%s'", svc->name);
 			kill(svc->pid, SIGTERM);
 			svc->flags |= FL_REMOVE;
 		} else {
@@ -538,11 +545,11 @@ static int cmd_pause(int argc, char *argv[])
 			continue;
 		}
 		if (pause && !(svc->flags & FL_PAUSED)) {
-			mylog(LOG_INFO, "pause '%s'", *svc->argv);
+			mylog(LOG_INFO, "pause '%s'", svc->name);
 			svc->flags |= FL_PAUSED;
 			libt_remove_timeout(exec_svc, svc);
 			if (svc->pid) {
-				mylog(LOG_INFO, "stop '%s'", *svc->argv);
+				mylog(LOG_INFO, "stop '%s'", svc->name);
 				kill(svc->pid, SIGTERM);
 			}
 			++ndone;
@@ -550,7 +557,7 @@ static int cmd_pause(int argc, char *argv[])
 			svc->flags &= ~FL_PAUSED;
 			libt_add_timeout(0, exec_svc, svc);
 			++ndone;
-			mylog(LOG_INFO, "unpause '%s'", *svc->argv);
+			mylog(LOG_INFO, "unpause '%s'", svc->name);
 		}
 	}
 	return ndone ?: -err;
@@ -865,13 +872,13 @@ int main(int argc, char *argv[])
 							svc->delay[0] =
 							svc->delay[1] = 0;
 							libt_add_timeout(0, exec_svc, svc);
-							mylog(LOG_WARNING, "restart '%s", *svc->argv);
+							mylog(LOG_WARNING, "restart '%s", svc->name);
 						} else {
 							int delay = (svc->delay[0] + svc->delay[1]) ?: 1;
 							svc->delay[0] = svc->delay[1];
 							svc->delay[1] = delay;
 							libt_add_timeout(delay, exec_svc, svc);
-							mylog(LOG_WARNING, "throttle '%s", *svc->argv);
+							mylog(LOG_WARNING, "throttle '%s", svc->name);
 						}
 						break;
 					}
