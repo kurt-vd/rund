@@ -449,6 +449,9 @@ static struct service *find_svc(struct service *svcs, char *args[])
 
 	for (svc = svcs; svc; svc = svc->next) {
 		for (j = 0; args[j]; ++j) {
+			if (!strcmp(args[j], svc->name))
+				/* argument may be name */
+				continue;
 			for (k = 0; svc->args[k]; ++k)
 				if (!strcmp(args[j], svc->args[k]))
 					break;
