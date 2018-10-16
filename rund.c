@@ -403,7 +403,7 @@ static int cmd_add(int argc, char *argv[])
 	svcs = svc;
 	mylog(LOG_INFO, "%s '%s'", svc->pid ? "import" : "add", svc->name);
 	/* exec now */
-	if (!svc->pid)
+	if (!svc->pid && !(svc->flags & FL_PAUSED))
 		exec_svc(svc);
 	return svc->pid;
 failed:
@@ -521,8 +521,7 @@ static int cmd_reload(int argc, char *argv[])
 			err = EPERM;
 			continue;
 		}
-		if (!svc->pid && (svc->delay[1] ||
-			(svc->flags & FL_INTERVAL))) {
+		if (!svc->pid && !(svc->flags & (FL_PAUSED || FL_REMOVE))) {
 			/* re-schedule immediate */
 			libt_remove_timeout(exec_svc, svc);
 			libt_add_timeout(0, exec_svc, svc);
