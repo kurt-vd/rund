@@ -1,5 +1,6 @@
 /* See LICENSE file for copyright and license details. */
 #include <errno.h>
+#include <math.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -213,13 +214,42 @@ struct service {
 		#define FL_INTERVAL	0x02
 		#define FL_PAUSED	0x04
 	double starttime;
-	int delay[2]; /* create fibonacci on the fly */
+	/* memory to decide throttling delay
+	 * based on fibonacci numbers
+	 */
+	unsigned long delay[2];
+	/* memory to decide for throttling */
+	#define MAXTIMES 3
+	double times[MAXTIMES];
+	int ntimes, ptimes;
+
 	char **args;
 	char **argv;
 	char *name;
 	int uid;
 	double interval;
 };
+
+/* fibonacci numbers utilities */
+static unsigned long fibonacci_next(unsigned long fib[2])
+{
+	unsigned long sum;
+
+	sum = fib[0] + fib[1];
+	fib[0] = fib[1];
+	fib[1] = sum;
+	return sum;
+}
+static void fibonacci_reset(unsigned long fib[2])
+{
+	fib[0] = 0;
+	fib[1] = 1;
+}
+
+static inline int svc_throttled(const struct service *svc)
+{
+	return svc->delay[0] != 0;
+}
 
 /* global list */
 static struct service *svcs;
@@ -231,8 +261,7 @@ static void exec_svc(void *dat)
 
 	if (!nullin)
 		set_nullin();
-	if (svc->delay[1])
-		/* this service has been throttled */
+	if (svc_throttled(svc))
 		mylog(LOG_INFO, "resume %s", svc->name);
 
 	ret = fork();
@@ -317,6 +346,7 @@ static int cmd_add(int argc, char *argv[])
 	if (!svc)
 		return -ENOMEM;
 	memset(svc, 0, sizeof(*svc));
+	fibonacci_reset(svc->delay);
 	svc->uid = peeruid;
 	/* copy args */
 	--argc; ++argv;
@@ -557,6 +587,7 @@ static int cmd_pause(int argc, char *argv[])
 			++ndone;
 		} else if (!pause && (svc->flags & FL_PAUSED) && !svc->pid) {
 			svc->flags &= ~FL_PAUSED;
+			fibonacci_reset(svc->delay);
 			libt_add_timeout(0, exec_svc, svc);
 			++ndone;
 			mylog(LOG_INFO, "unpause '%s'", svc->name);
@@ -745,6 +776,43 @@ struct cmd {
 	{ },
 };
 
+/* statistics */
+static double svc_throttle_time(struct service *svc, double texec)
+{
+	/* maintain stats */
+	if (svc->ntimes < MAXTIMES)
+		svc->times[svc->ntimes++] = texec;
+	else {
+		svc->times[svc->ptimes++] = texec;
+		svc->ptimes %= MAXTIMES;
+	}
+
+	if (texec < 1)
+		/* too short, throttle */
+		return fibonacci_next(svc->delay);
+
+	if (svc->ntimes <= 1)
+		return 0;
+
+	/* take average */
+	double sum, ssum, mean, dev;
+	int n;
+	for (n = 0, sum = ssum = 0; n < svc->ntimes; ++n) {
+		sum += svc->times[n];
+		ssum += svc->times[n]*svc->times[n];
+	}
+	mean = sum/n;
+	dev = sqrt((ssum/n)-mean*mean);
+
+	if (svc->ntimes > 1 && fabs(dev/mean) < 0.1)
+		/* systematic failure suspected, throttle */
+		return fibonacci_next(svc->delay)*mean;
+
+	/* reset throttling */
+	fibonacci_reset(svc->delay);
+	return 0;
+}
+
 /* main process */
 int main(int argc, char *argv[])
 {
@@ -858,31 +926,25 @@ int main(int argc, char *argv[])
 						rcpid = 0;
 					/* find service */
 					for (svc = svcs; svc; svc = svc->next) {
-						if (pid != svc->pid)
-							continue;
-						svc->pid = 0;
-						if (svc->flags & FL_REMOVE) {
-							cleanup_svc(svc);
+						if (pid == svc->pid)
 							break;
-						}
-						if (svc->flags & FL_PAUSED)
-							break;
-						if (svc->flags & FL_INTERVAL) {
-							libt_add_timeout(svc->interval, exec_svc, svc);
-						} else if ((svc->starttime + 2) < libt_now()) {
-							/* reset delays */
-							svc->delay[0] =
-							svc->delay[1] = 0;
-							libt_add_timeout(0, exec_svc, svc);
-							mylog(LOG_WARNING, "restart '%s", svc->name);
-						} else {
-							int delay = (svc->delay[0] + svc->delay[1]) ?: 1;
-							svc->delay[0] = svc->delay[1];
-							svc->delay[1] = delay;
-							libt_add_timeout(delay, exec_svc, svc);
-							mylog(LOG_WARNING, "throttle '%s", svc->name);
-						}
-						break;
+					}
+					if (!svc)
+						continue;
+					/* found svc */
+					svc->pid = 0;
+					if (svc->flags & FL_REMOVE)
+						cleanup_svc(svc);
+
+					else if (svc->flags & FL_PAUSED)
+						; /* do nothing */
+
+					else if (svc->flags & FL_INTERVAL)
+						libt_add_timeout(svc->interval, exec_svc, svc);
+					else {
+						double delay = svc_throttle_time(svc, libt_now() - svc->starttime);
+						mylog(LOG_WARNING, "%s '%s", svc_throttled(svc) ? "throttle" : "restart", svc->name);
+						libt_add_timeout(delay, exec_svc, svc);
 					}
 				}
 				break;
