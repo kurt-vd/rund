@@ -911,14 +911,7 @@ int main(int argc, char *argv[])
 			case SIGHUP:
 				/* retry throttled services */
 				mylog(LOG_INFO, "reload ...");
-				for (svc = svcs; svc; svc = svc->next) {
-					if (!svc->pid && (svc->delay[1] ||
-						(svc->flags & FL_INTERVAL))) {
-						/* re-schedule immediate */
-						libt_remove_timeout(exec_svc, svc);
-						libt_add_timeout(0, exec_svc, svc);
-					}
-				}
+				cmd_reload(2, (char *[]){ "reload", "*", NULL, });
 				break;
 			}
 		}
