@@ -903,6 +903,12 @@ int main(int argc, char *argv[])
 	} else if (rcpid < 0)
 		mylog(LOG_CRIT, "fork: %s", ESTR(errno));
 
+	/* Clear the environment.
+	 * boot parameters & environment values have been passed to INIT already.
+	 * INIT should provide back relevant environment variables.
+	 */
+	clearenv();
+
 	while (1) {
 		libt_flush();
 
