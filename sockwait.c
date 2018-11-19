@@ -12,6 +12,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 
 #define NAME "sockwait"
 
@@ -28,7 +30,7 @@
 /* program options */
 static const char help_msg[] =
 	NAME ": wait for a socket\n"
-	"usage:	" NAME " [OPTIONS ...] SOCKET\n"
+	"usage:	" NAME " [OPTIONS ...] SOCKET [PORT]\n"
 	"\n"
 	"Options:\n"
 	" -V	Show version\n"
@@ -36,11 +38,13 @@ static const char help_msg[] =
 	"		until 0 is returned\n"
 	" -d	DGRAM socket\n"
 	" -f	Wait on regular file (or directory or symlink ...)\n"
+	" -4	Wait on an ipv4 socket (provide a port)\n"
+	" -6	Wait on an ipv6 socket (provide a port)\n"
 	" -n	Return when socket is remotely closed\n"
 	"	Consumes all received data\n"
 	" -F	Use non-full length for abstract sockets\n"
 	;
-static const char optstring[] = "?Vr:dfnF";
+static const char optstring[] = "?Vr:dfnF46";
 
 /* main process */
 int main(int argc, char *argv[])
@@ -49,6 +53,8 @@ int main(int argc, char *argv[])
 	union {
 		struct sockaddr sa;
 		struct sockaddr_un un;
+		struct sockaddr_in in;
+		struct sockaddr_in6 in6;
 	} name = {
 		.sa.sa_family = PF_UNIX,
 	};
@@ -78,6 +84,12 @@ int main(int argc, char *argv[])
 		break;
 	case 'f':
 		name.sa.sa_family = -1;
+		break;
+	case '4':
+		name.sa.sa_family = PF_INET;
+		break;
+	case '6':
+		name.sa.sa_family = PF_INET6;
 		break;
 	case 'n':
 		flags |= FL_WAITCLOSE;
@@ -130,6 +142,16 @@ int main(int argc, char *argv[])
 			if (flags & FL_FULLNAME)
 				socklen = sizeof(name.un);
 		}
+		break;
+	case PF_INET:
+		inet_pton(AF_INET, peerstr, &name.in.sin_addr);
+		name.in.sin_port = htons(strtoul(argv[optind++], NULL, 10));
+		socklen = sizeof(name.in);
+		break;
+	case PF_INET6:
+		inet_pton(AF_INET6, peerstr, &name.in6.sin6_addr);
+		name.in6.sin6_port = htons(strtoul(argv[optind++], NULL, 10));
+		socklen = sizeof(name.in6);
 		break;
 	default:
 		mylog(LOG_ERR, "Protocol family %u not supported", name.sa.sa_family);
