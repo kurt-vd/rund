@@ -753,6 +753,23 @@ static int cmd_exec(int argc, char *argv[])
 	return -errno;
 }
 
+static double maxthrottle = INFINITY;
+static int cmd_maxthrottle(int argc, char *argv[])
+{
+	double value;
+
+	if (myuid != (peeruid ?: myuid))
+		return -EPERM;
+	if (argc <= 1)
+		return -EINVAL;
+	value = strtod(argv[1], NULL);
+	if (value < 60)
+		return -EINVAL;
+	maxthrottle = value;
+	mylog(LOG_NOTICE, "maxthrottle changed to %.0lf", maxthrottle);
+	return 0;
+}
+
 /* remote commands */
 struct cmd {
 	const char *name;
@@ -767,6 +784,7 @@ struct cmd {
 	{ "suspend", cmd_pause, },
 	{ "resume", cmd_pause, },
 	/* management commands */
+	{ "maxthrottle", cmd_maxthrottle, },
 	{ "syslog", cmd_syslog, },
 	{ "loglevel", cmd_loglevel, },
 	{ "redir", cmd_redir, },
@@ -789,7 +807,7 @@ static double svc_throttle_time(struct service *svc, double texec)
 
 	if (texec < 1)
 		/* too short, throttle */
-		return fibonacci_next(svc->delay);
+		return fmin(fibonacci_next(svc->delay), maxthrottle);
 
 	if (svc->ntimes <= 1)
 		return 0;
@@ -806,7 +824,7 @@ static double svc_throttle_time(struct service *svc, double texec)
 
 	if (svc->ntimes > 1 && fabs(dev/mean) < 0.1)
 		/* systematic failure suspected, throttle */
-		return fibonacci_next(svc->delay)*mean;
+		return fmin(fibonacci_next(svc->delay)*mean, maxthrottle);
 
 	/* reset throttling */
 	fibonacci_reset(svc->delay);

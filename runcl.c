@@ -64,6 +64,8 @@ static const char help_msg[] =
 	"	Stops a service, but do not forget about it\n"
 	" resume [KEY=VALUE ...] [PRORAM] [ARGUMENT ...]\n"
 	"	resumes a service, but do not forget about it\n"
+	" maxthrottle VALUE\n"
+	"	put a ceiling on throttling delays for all services\n"
 	" syslog\n"
 	" loglevel\n"
 	" redir\n"
