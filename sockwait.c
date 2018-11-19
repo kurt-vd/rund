@@ -46,12 +46,16 @@ static const char optstring[] = "?Vr:dfnF";
 int main(int argc, char *argv[])
 {
 	int ret, opt, sock;
-	struct sockaddr_un name = {
-		.sun_family = AF_UNIX,
+	union {
+		struct sockaddr sa;
+		struct sockaddr_un un;
+	} name = {
+		.sa.sa_family = PF_UNIX,
 	};
 	int socklen;
 	static char rbuf[16*1024];
 	double repeat = 1;
+	const char *peerstr;
 
 		#define FL_WAITCLOSE	0x01
 		#define FL_FULLNAME	0x02
@@ -73,7 +77,7 @@ int main(int argc, char *argv[])
 		socktype = SOCK_DGRAM;
 		break;
 	case 'f':
-		socktype = -1;
+		name.sa.sa_family = -1;
 		break;
 	case 'n':
 		flags |= FL_WAITCLOSE;
@@ -94,36 +98,48 @@ int main(int argc, char *argv[])
 		fputs(help_msg, stderr);
 		exit(1);
 	}
+	peerstr = argv[optind++];
 	if ((socktype != SOCK_STREAM) && (flags & FL_WAITCLOSE))
 		mylog(LOG_ERR, "-n is only possible for STREAM sockets");
 
 	while (socktype == -1) {
-		/* wait on file */
-		struct stat st;
-
-		if (0 == stat(argv[optind], &st)) {
-			if (!(flags & FL_WAITCLOSE))
-				return 0;
-		} else if (errno == ENOENT) {
-			if (flags & FL_WAITCLOSE)
-				return 0;
-		}
-		usleep(repeat*1000000);
 	}
 
-	strncpy(name.sun_path, argv[optind], sizeof(name.sun_path));
-	socklen = sizeof(name.sun_family) + strlen(name.sun_path);
-	if (name.sun_path[0] == '@') {
-		/* abstrace namespace */
-		name.sun_path[0] = 0;
-		if (flags & FL_FULLNAME)
-			socklen = sizeof(name);
+	switch (name.sa.sa_family) {
+	case -1:
+		/* wait on file */
+		for (;;) {
+			struct stat st;
+
+			if (0 == stat(peerstr, &st)) {
+				if (!(flags & FL_WAITCLOSE))
+					return 0;
+			} else if (errno == ENOENT) {
+				if (flags & FL_WAITCLOSE)
+					return 0;
+			}
+			poll(NULL, 0, repeat*1000);
+		}
+		break;
+	case PF_UNIX:
+		strncpy(name.un.sun_path, peerstr, sizeof(name.un.sun_path));
+		socklen = sizeof(name.un.sun_family) + strlen(name.un.sun_path);
+		if (name.un.sun_path[0] == '@') {
+			/* abstrace namespace */
+			name.un.sun_path[0] = 0;
+			if (flags & FL_FULLNAME)
+				socklen = sizeof(name.un);
+		}
+		break;
+	default:
+		mylog(LOG_ERR, "Protocol family %u not supported", name.sa.sa_family);
+		break;
 	}
 
 	/* open client socket */
-	ret = sock = socket(PF_UNIX, socktype, 0);
+	ret = sock = socket(name.sa.sa_family, socktype, 0);
 	if (ret < 0)
-		mylog(LOG_ERR, "socket(unix, ...) failed: %s", ESTR(errno));
+		mylog(LOG_ERR, "socket '%s' failed: %s", peerstr, ESTR(errno));
 
 	/* connect to server */
 	while (!(flags & FL_WAITCLOSE)) {
@@ -132,14 +148,14 @@ int main(int argc, char *argv[])
 			/* done */
 			return 0;
 		if (errno != ECONNREFUSED && errno != ENOENT)
-			mylog(LOG_ERR, "connect(%c%s) failed: %s", name.sun_path[0] ?: '@', &name.sun_path[1], ESTR(errno));
+			mylog(LOG_ERR, "connect '%s' failed: %s", peerstr, ESTR(errno));
 		poll(NULL, 0, repeat*1000);
 	}
 
 	/* waitclose */
 	ret = connect(sock, (void *)&name, socklen);
 	if (ret < 0)
-		mylog(LOG_ERR, "connect(%c%s) failed: %s", name.sun_path[0] ?: '@', &name.sun_path[1], ESTR(errno));
+		mylog(LOG_ERR, "connect '%s' failed: %s", peerstr, ESTR(errno));
 
 	while (1) {
 		ret = recv(sock, rbuf, sizeof(rbuf), 0);
