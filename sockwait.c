@@ -8,9 +8,9 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <poll.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/socket.h>
 #include <sys/un.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
 	} name = {
 		.sa.sa_family = PF_UNIX,
 	};
-	int socklen;
+	int socklen = sizeof(name);
 	static char rbuf[16*1024];
 	double repeat = 1;
 	const char *peerstr;
@@ -77,13 +77,13 @@ int main(int argc, char *argv[])
 	case 'r':
 		repeat = strtod(optarg, NULL);
 		if (!(repeat > 0))
-			mylog(LOG_ERR, "bad rate '%s'", optarg);
+			mylog(LOG_ERR, "bad rate '%s': <= 0", optarg);
 		break;
 	case 'd':
 		socktype = SOCK_DGRAM;
 		break;
 	case 'f':
-		name.sa.sa_family = -1;
+		name.sa.sa_family = 0xffff;
 		break;
 	case '4':
 		name.sa.sa_family = PF_INET;
@@ -114,11 +114,8 @@ int main(int argc, char *argv[])
 	if ((socktype != SOCK_STREAM) && (flags & FL_WAITCLOSE))
 		mylog(LOG_ERR, "-n is only possible for STREAM sockets");
 
-	while (socktype == -1) {
-	}
-
 	switch (name.sa.sa_family) {
-	case -1:
+	case 0xffff:
 		/* wait on file */
 		for (;;) {
 			struct stat st;
@@ -163,8 +160,9 @@ int main(int argc, char *argv[])
 	if (ret < 0)
 		mylog(LOG_ERR, "socket '%s' failed: %s", peerstr, ESTR(errno));
 
-	/* connect to server */
-	while (!(flags & FL_WAITCLOSE)) {
+	if (!(flags & FL_WAITCLOSE))
+	/* wait for connection to server */
+	for (;;) {
 		ret = connect(sock, (void *)&name, socklen);
 		if (ret >= 0)
 			/* done */
@@ -179,7 +177,7 @@ int main(int argc, char *argv[])
 	if (ret < 0)
 		mylog(LOG_ERR, "connect '%s' failed: %s", peerstr, ESTR(errno));
 
-	while (1) {
+	for (;;) {
 		ret = recv(sock, rbuf, sizeof(rbuf), 0);
 		if (!ret)
 			/* EOF, socket down */
