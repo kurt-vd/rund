@@ -1,6 +1,7 @@
 /* See LICENSE file for copyright and license details. */
 #include <errno.h>
 #include <math.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,6 +12,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/un.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -36,6 +38,7 @@ static const char help_msg[] =
 	" -V	Show version\n"
 	" -rDELAY	Repeat command each DELAY secs (default 1.0)\n"
 	"		until 0 is returned\n"
+	" -mDELAY	Repeat Maximum during DELAY secs\n"
 	" -d	DGRAM socket\n"
 	" -f	Wait on regular file (or directory or symlink ...)\n"
 	" -4	Wait on an ipv4 socket (provide a port)\n"
@@ -44,8 +47,17 @@ static const char help_msg[] =
 	"	Consumes all received data\n"
 	" -F	Use non-full length for abstract sockets\n"
 	;
-static const char optstring[] = "?Vr:dfnF46";
+static const char optstring[] = "?Vr:m:dfnF46";
 
+/* global variables */
+static const char *peerstr;
+static double maxtime;
+
+static void onsigalrm(int sig)
+{
+	mylog(LOG_ERR, "not succeeded to %s within %.1lfs", peerstr, maxtime);
+	exit(1);
+}
 /* main process */
 int main(int argc, char *argv[])
 {
@@ -61,12 +73,12 @@ int main(int argc, char *argv[])
 	int socklen = sizeof(name);
 	static char rbuf[16*1024];
 	double repeat = 1;
-	const char *peerstr;
 
 		#define FL_WAITCLOSE	0x01
 		#define FL_FULLNAME	0x02
 	int flags = FL_FULLNAME;
 	int socktype = SOCK_STREAM;
+	struct itimerval it = {};
 
 	/* parse program options */
 	while ((opt = getopt(argc, argv, optstring)) != -1)
@@ -78,6 +90,18 @@ int main(int argc, char *argv[])
 		repeat = strtod(optarg, NULL);
 		if (!(repeat > 0))
 			mylog(LOG_ERR, "bad rate '%s': <= 0", optarg);
+		break;
+	case 'm':
+		maxtime = strtod(optarg, NULL);
+		if (maxtime < 0)
+			mylog(LOG_ERR, "bad maxtime '%s': < 0", optarg);
+		it.it_value.tv_sec = (int)maxtime;
+		it.it_value.tv_usec = (int)(maxtime*1e6)%1000000;
+		/* schedule SIGALRM */
+		if (setitimer(ITIMER_REAL, &it, NULL) < 0)
+			mylog(LOG_ERR, "setitimer %.3lf: %s", maxtime, ESTR(errno));
+		/* install quiet handler */
+		signal(SIGALRM, onsigalrm);
 		break;
 	case 'd':
 		socktype = SOCK_DGRAM;

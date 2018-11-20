@@ -39,7 +39,7 @@ static const char help_msg[] =
 	" -q	Quiet, don't print replies\n"
 	" -r[DELAY]	Repeat command each DELAY secs (default 1.0)\n"
 	"		until 0 is returned\n"
-	" -mDELAY	Repeat Maxixum during DELAY secs\n"
+	" -mDELAY	Repeat Maximum during DELAY secs\n"
 	" -sSOCK	Use alternative socket SOCK\n"
 	"\n"
 	"Commands:\n"
