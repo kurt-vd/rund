@@ -315,7 +315,7 @@ static void exec_svc(void *dat)
 	}
 }
 
-static int svc_exist(struct service *dut)
+static struct service *svc_exists(struct service *dut)
 {
 	struct service *svc;
 	int j;
@@ -323,15 +323,18 @@ static int svc_exist(struct service *dut)
 	for (svc = svcs; svc; svc = svc->next) {
 		if (svc->uid != dut->uid)
 			continue;
+		if (svc->flags & FL_REMOVE)
+			/* ignore services about to be removed */
+			continue;
 
 		for (j = 0; svc->args[j] && dut->args[j]; ++j) {
 			if (strcmp(svc->args[j], dut->args[j]))
 				break;
 		}
 		if (!svc->args[j] && !dut->args[j])
-			return 1;
+			return svc;
 	}
-	return 0;
+	return NULL;
 }
 
 static int cmd_add(int argc, char *argv[])
@@ -423,7 +426,7 @@ static int cmd_add(int argc, char *argv[])
 	svc->args[f] = NULL;
 	if (!svc->argv)
 		svc->argv = svc->args;
-	if (svc_exist(svc)) {
+	if (svc_exists(svc)) {
 		result = -EEXIST;
 		goto failed;
 	}
@@ -466,18 +469,21 @@ static void cleanup_svc(struct service *svc)
 	free(svc);
 }
 
-static struct service *find_svc(struct service *svcs, char *args[])
+static struct service *find_svc3(struct service *svcs, char *args[], int accept_removing)
 {
 	struct service *svc;
 	int j, k;
 
 	if (!args)
 		return NULL;
-	if (*args && !strcmp(*args, "*"))
-		/* wildcard matches all */
-		return svcs;
 
 	for (svc = svcs; svc; svc = svc->next) {
+		if (!accept_removing && (svc->flags & FL_REMOVE))
+			/* do not return a removing service */
+			continue;
+		if (!strcmp(args[0] ?: "", "*"))
+			/* wildcard matches all */
+			return svc;
 		for (j = 0; args[j]; ++j) {
 			if (!strcmp(args[j], svc->name))
 				/* argument may be name */
@@ -495,6 +501,10 @@ nomatch:
 		continue;
 	}
 	return NULL;
+}
+static inline struct service *find_svc(struct service *svcs, char *args[])
+{
+	return find_svc3(svcs, args, 0);
 }
 
 static int cmd_remove(int argc, char *argv[])
@@ -531,7 +541,7 @@ static int cmd_removing(int argc, char *argv[])
 	struct service *svc;
 	int ndone = 0;
 
-	for (svc = find_svc(svcs, argv+1); svc; svc = find_svc(svc->next, argv+1)) {
+	for (svc = find_svc3(svcs, argv+1, 1); svc; svc = find_svc3(svc->next, argv+1, 1)) {
 		if (peeruid && (svc->uid != peeruid))
 			continue;
 		if (svc->flags & FL_REMOVE)
@@ -551,7 +561,7 @@ static int cmd_reload(int argc, char *argv[])
 			err = EPERM;
 			continue;
 		}
-		if (!svc->pid && !(svc->flags & (FL_PAUSED || FL_REMOVE))) {
+		if (!svc->pid && !(svc->flags & FL_PAUSED)) {
 			/* re-schedule immediate */
 			libt_remove_timeout(exec_svc, svc);
 			libt_add_timeout(0, exec_svc, svc);
@@ -706,7 +716,9 @@ static int cmd_status(int argc, char *argv[])
 
 	if (strpbrk(options, "as"))
 	/* add services */
-	for (svc = find_svc(svcs, argv+1); svc; svc = find_svc(svc->next, argv+1)) {
+	for (svc = find_svc3(svcs, argv+1, 1); svc; svc = find_svc3(svc->next, argv+1, 1)) {
+		if ((svc->flags & FL_REMOVE) && !strchr(options, 'x'))
+			continue;
 		if (peeruid && (svc->uid != peeruid)) {
 			/* change returned error into 'permission ...' */
 			err = EPERM;
@@ -722,6 +734,8 @@ static int cmd_status(int argc, char *argv[])
 			bufp += sprintf(bufp, "USER=#%u", svc->uid) +1;
 		if (svc->flags & FL_INTERVAL)
 			bufp += sprintf(bufp, "INTERVAL=%lf", svc->interval) +1;
+		if (svc->flags & FL_REMOVE)
+			bufp += sprintf(bufp, "REMOVING=1") +1;
 		if (svc->flags & FL_PAUSED)
 			bufp += sprintf(bufp, "PAUSED=1") +1;
 		for (j = 0; svc->args[j]; ++j) {

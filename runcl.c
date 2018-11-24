@@ -73,7 +73,7 @@ static const char help_msg[] =
 	"	Change environment variable\n"
 	" env KEY=\n"
 	"	unset environment variable\n"
-	" status [-wsad] [KEY=VALUE] [PROGRAM] [ARGUMENT ...]\n"
+	" status [-wsadx] [KEY=VALUE] [PROGRAM] [ARGUMENT ...]\n"
 	"	Retrieve status from rund\n"
 	" exec PROGRAM [ARGUMENT ...]\n"
 	"	exec() another program, possible the same\n"
