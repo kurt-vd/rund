@@ -213,6 +213,7 @@ struct service {
 		#define FL_REMOVE	0x01
 		#define FL_INTERVAL	0x02
 		#define FL_PAUSED	0x04
+		#define FL_KILLSPEC	0x08
 	double starttime;
 	/* memory to decide throttling delay
 	 * based on fibonacci numbers
@@ -228,6 +229,8 @@ struct service {
 	char *name;
 	int uid;
 	double interval;
+	/* end-of-life state */
+	int killgrpdelay, killharddelay;
 };
 
 /* fibonacci numbers utilities */
@@ -253,6 +256,17 @@ static inline int svc_throttled(const struct service *svc)
 
 /* global list */
 static struct service *svcs;
+static int gkillgrpdelay, gkillharddelay;
+
+/* utils */
+static inline int svckillgrpdelay(const struct service *svc)
+{
+	return (svc->flags & FL_KILLSPEC) ? svc->killgrpdelay : gkillgrpdelay;
+}
+static inline int svckillharddelay(const struct service *svc)
+{
+	return (svc->flags & FL_KILLSPEC) ? svc->killharddelay : gkillharddelay;
+}
 
 static void exec_svc(void *dat)
 {
@@ -341,6 +355,7 @@ static int cmd_add(int argc, char *argv[])
 {
 	struct service *svc, *svc2;
 	int j, f, result = 0;
+	char *endp;
 
 	if (myuid && peeruid && (myuid != peeruid))
 		/* block on regular user mismatch */
@@ -410,6 +425,12 @@ static int cmd_add(int argc, char *argv[])
 			continue;
 		} else if (!strcmp("PAUSED=1", argv[j])) {
 			svc->flags |= FL_PAUSED;
+			continue;
+		} else if (!strncmp("KILL=", argv[j], 5)) {
+			svc->killgrpdelay = strtoul(argv[j]+5, &endp, 0);
+			if (*endp == ',')
+				svc->killharddelay = strtoul(endp+1, NULL, 0);
+			svc->flags |= FL_KILLSPEC;
 			continue;
 		}
 		svc->args[f] = strdup(argv[j]);
@@ -507,6 +528,22 @@ static inline struct service *find_svc(struct service *svcs, char *args[])
 	return find_svc3(svcs, args, 0);
 }
 
+static void killhard(void *dat)
+{
+	struct service *svc = dat;
+
+	kill(-svc->pid, SIGKILL);
+}
+
+static void killgrp(void *dat)
+{
+	struct service *svc = dat;
+
+	kill(-svc->pid, SIGTERM);
+	if (svckillharddelay(svc))
+		libt_add_timeout(svckillharddelay(svc), killhard, svc);
+}
+
 static int cmd_remove(int argc, char *argv[])
 {
 	struct service *svc, *nsvc;
@@ -527,6 +564,10 @@ static int cmd_remove(int argc, char *argv[])
 			mylog(LOG_INFO, "stop '%s'", svc->name);
 			kill(svc->pid, SIGTERM);
 			svc->flags |= FL_REMOVE;
+			if (svckillgrpdelay(svc))
+				libt_add_timeout(svckillgrpdelay(svc), killgrp, svc);
+			else if (svckillharddelay(svc))
+				libt_add_timeout(svckillharddelay(svc), killhard, svc);
 		} else {
 			libt_remove_timeout(exec_svc, svc);
 			cleanup_svc(svc);
@@ -593,6 +634,10 @@ static int cmd_pause(int argc, char *argv[])
 			if (svc->pid) {
 				mylog(LOG_INFO, "stop '%s'", svc->name);
 				kill(svc->pid, SIGTERM);
+				if (svckillgrpdelay(svc))
+					libt_add_timeout(svckillgrpdelay(svc), killgrp, svc);
+				else if (svckillharddelay(svc))
+					libt_add_timeout(svckillharddelay(svc), killhard, svc);
 			}
 			++ndone;
 		} else if (!pause && (svc->flags & FL_PAUSED) && !svc->pid) {
@@ -738,6 +783,15 @@ static int cmd_status(int argc, char *argv[])
 			bufp += sprintf(bufp, "REMOVING=1") +1;
 		if (svc->flags & FL_PAUSED)
 			bufp += sprintf(bufp, "PAUSED=1") +1;
+		if (svc->flags & FL_KILLSPEC) {
+			bufp += sprintf(bufp, "KILL=");
+			if (svc->killgrpdelay)
+				bufp += sprintf(bufp, "%i", svc->killgrpdelay);
+			if (svc->killharddelay)
+				bufp += sprintf(bufp, ",%i", svc->killharddelay);
+			/* add null terminator */
+			bufp += 1;
+		}
 		for (j = 0; svc->args[j]; ++j) {
 			strcpy(bufp, svc->args[j]);
 			bufp += strlen(bufp)+1;
@@ -784,6 +838,20 @@ static int cmd_maxthrottle(int argc, char *argv[])
 	return 0;
 }
 
+static int cmd_setkill(int argc, char *argv[])
+{
+	if (argc <= 1)
+		return -EINVAL;
+
+	gkillgrpdelay = strtoul(argv[1], NULL, 0);
+	if (argc > 2)
+		gkillharddelay = strtoul(argv[2], NULL, 0);
+	else
+		gkillharddelay = 0;
+	mylog(LOG_NOTICE, "global kill spec set to %u,%u", gkillgrpdelay, gkillharddelay);
+	return 0;
+}
+
 /* remote commands */
 struct cmd {
 	const char *name;
@@ -799,6 +867,7 @@ struct cmd {
 	{ "resume", cmd_pause, },
 	/* management commands */
 	{ "maxthrottle", cmd_maxthrottle, },
+	{ "setkill", cmd_setkill, },
 	{ "syslog", cmd_syslog, },
 	{ "loglevel", cmd_loglevel, },
 	{ "redir", cmd_redir, },
@@ -971,10 +1040,12 @@ int main(int argc, char *argv[])
 						continue;
 					/* found svc */
 					svc->pid = 0;
-					if (svc->flags & FL_REMOVE)
+					if (svc->flags & FL_REMOVE) {
+						libt_remove_timeout(killgrp, svc);
+						libt_remove_timeout(killhard, svc);
 						cleanup_svc(svc);
 
-					else if (svc->flags & FL_PAUSED)
+					} else if (svc->flags & FL_PAUSED)
 						; /* do nothing */
 
 					else if (svc->flags & FL_INTERVAL)

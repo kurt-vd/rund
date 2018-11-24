@@ -66,6 +66,8 @@ static const char help_msg[] =
 	"	resumes a service, but do not forget about it\n"
 	" maxthrottle VALUE\n"
 	"	put a ceiling on throttling delays for all services\n"
+	" setkill GRPKILLDELAY [HARDKILLDELAY]\n"
+	"	change global group-kill delay and hard-kill delay\n"
 	" syslog\n"
 	" loglevel\n"
 	" redir\n"
