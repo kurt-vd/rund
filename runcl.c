@@ -53,6 +53,7 @@ static const char help_msg[] =
 	"	USER=	to run as different user\n"
 	"	INTERVAL=	to run with intervals\n"
 	"	PAUSED=1	to start suspended\n"
+	"	ONESHOT=1	to start a single run\n"
 	" remove [KEY=VALUE ...] [PROGRAM] [ARGUMENT ...]\n"
 	"	Remove a service\n"
 	" remove *\n"

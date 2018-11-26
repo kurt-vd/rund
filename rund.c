@@ -214,6 +214,7 @@ struct service {
 		#define FL_INTERVAL	0x02
 		#define FL_PAUSED	0x04
 		#define FL_KILLSPEC	0x08
+		#define FL_ONESHOT	0x10
 	double starttime;
 	/* memory to decide throttling delay
 	 * based on fibonacci numbers
@@ -337,7 +338,7 @@ static struct service *svc_exists(struct service *dut)
 	for (svc = svcs; svc; svc = svc->next) {
 		if (svc->uid != dut->uid)
 			continue;
-		if (svc->flags & FL_REMOVE)
+		if (svc->flags & (FL_REMOVE | FL_ONESHOT))
 			/* ignore services about to be removed */
 			continue;
 
@@ -431,6 +432,9 @@ static int cmd_add(int argc, char *argv[])
 			if (*endp == ',')
 				svc->killharddelay = strtoul(endp+1, NULL, 0);
 			svc->flags |= FL_KILLSPEC;
+			continue;
+		} else if (!strcmp("ONESHOT=1", argv[j])) {
+			svc->flags |= FL_ONESHOT;
 			continue;
 		}
 		svc->args[f] = strdup(argv[j]);
@@ -792,6 +796,8 @@ static int cmd_status(int argc, char *argv[])
 			/* add null terminator */
 			bufp += 1;
 		}
+		if (svc->flags & FL_ONESHOT)
+			bufp += sprintf(bufp, "ONESHOT=1") +1;
 		for (j = 0; svc->args[j]; ++j) {
 			strcpy(bufp, svc->args[j]);
 			bufp += strlen(bufp)+1;
@@ -1040,7 +1046,10 @@ int main(int argc, char *argv[])
 						continue;
 					/* found svc */
 					svc->pid = 0;
-					if (svc->flags & FL_REMOVE) {
+					if (svc->flags & (FL_REMOVE | FL_ONESHOT)) {
+						if (!(svc->flags & FL_REMOVE))
+							/* notify 'unexpected' end */
+							mylog(LOG_WARNING, "'%s' ended", svc->name);
 						libt_remove_timeout(killgrp, svc);
 						libt_remove_timeout(killhard, svc);
 						cleanup_svc(svc);
