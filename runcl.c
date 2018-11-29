@@ -51,6 +51,7 @@ static const char help_msg[] =
 	"	Special environment variables:\n"
 	"	NAME=	Specify label (default is to use PROGRAM)\n"
 	"	USER=	to run as different user\n"
+	"	KILL=[GRP][,HARD] Add group-kill and/or hard-kill delays\n"
 	"	INTERVAL=	to run with intervals\n"
 	"	PAUSED=1	to start suspended\n"
 	"	ONESHOT=1	to start a single run\n"
