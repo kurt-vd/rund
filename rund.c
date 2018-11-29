@@ -479,7 +479,6 @@ static void cleanup_svc(struct service *svc)
 	struct service **psvc;
 	int j;
 
-	mylog(LOG_INFO, "remove '%s'", svc->name);
 	/* remove from linked list */
 	for (psvc = &svcs; *psvc; psvc = &(*psvc)->next) {
 		if (*psvc == svc) {
@@ -536,6 +535,7 @@ static void killhard(void *dat)
 {
 	struct service *svc = dat;
 
+	mylog(LOG_INFO, "kill-hard '%s'", svc->name);
 	kill(-svc->pid, SIGKILL);
 }
 
@@ -543,6 +543,7 @@ static void killgrp(void *dat)
 {
 	struct service *svc = dat;
 
+	mylog(LOG_INFO, "stop-grp '%s'", svc->name);
 	kill(-svc->pid, SIGTERM);
 	if (svckillharddelay(svc))
 		libt_add_timeout(svckillharddelay(svc), killhard, svc);
@@ -573,6 +574,7 @@ static int cmd_remove(int argc, char *argv[])
 			else if (svckillharddelay(svc))
 				libt_add_timeout(svckillharddelay(svc), killhard, svc);
 		} else {
+			mylog(LOG_INFO, "remove '%s'", svc->name);
 			libt_remove_timeout(exec_svc, svc);
 			cleanup_svc(svc);
 		}
@@ -667,7 +669,7 @@ static int cmd_syslog(int argc, char *argv[])
 	} else {
 		if (syslog_open)
 			return -EEXIST;
-		openlog("rund", LOG_PERROR, LOG_DAEMON);
+		openlog("rund", 0, LOG_DAEMON);
 		syslog_open = 1;
 	}
 	return 0;
@@ -1050,6 +1052,8 @@ int main(int argc, char *argv[])
 						if (!(svc->flags & FL_REMOVE))
 							/* notify 'unexpected' end */
 							mylog(LOG_WARNING, "'%s' ended", svc->name);
+						else
+							mylog(LOG_INFO, "removed '%s'", svc->name);
 						libt_remove_timeout(killgrp, svc);
 						libt_remove_timeout(killhard, svc);
 						cleanup_svc(svc);
