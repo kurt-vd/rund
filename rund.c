@@ -232,6 +232,9 @@ struct service {
 	double interval;
 	/* end-of-life state */
 	int killgrpdelay, killharddelay;
+
+	/* message to log on next start */
+	const char *startmsg;
 };
 
 /* fibonacci numbers utilities */
@@ -276,8 +279,9 @@ static void exec_svc(void *dat)
 
 	if (!nullin)
 		set_nullin();
-	if (svc_throttled(svc))
-		mylog(LOG_INFO, "resume %s", svc->name);
+	if (svc->startmsg)
+		mylog(LOG_INFO, "%s '%s'", svc->startmsg, svc->name);
+	svc->startmsg = NULL;
 
 	ret = fork();
 	if (ret < 0) {
@@ -469,6 +473,7 @@ static int cmd_add(int argc, char *argv[])
 	else if (delay > 0) {
 		/* schedule initial delay */
 		mylog(LOG_INFO, "scheduled '%s'", svc->name);
+		svc->startmsg = "start";
 		libt_add_timeout(delay, exec_svc, svc);
 	} else if (svc->flags & FL_PAUSED) {
 		mylog(LOG_INFO, "declared '%s'", svc->name);
@@ -670,7 +675,7 @@ static int cmd_pause(int argc, char *argv[])
 			fibonacci_reset(svc->delay);
 			libt_add_timeout(0, exec_svc, svc);
 			++ndone;
-			mylog(LOG_INFO, "unpause '%s'", svc->name);
+			svc->startmsg = "resume";
 		}
 	}
 	return ndone ?: -err;
@@ -1077,14 +1082,20 @@ int main(int argc, char *argv[])
 						libt_remove_timeout(killhard, svc);
 						cleanup_svc(svc);
 
-					} else if (svc->flags & FL_PAUSED)
+					} else if (svc->flags & FL_PAUSED) {
 						; /* do nothing */
 
-					else if (svc->flags & FL_INTERVAL)
+					} else if (svc->flags & FL_INTERVAL) {
+						svc->startmsg = "wakeup";
 						libt_add_timeout(svc->interval, exec_svc, svc);
-					else {
+					} else {
 						double delay = svc_throttle_time(svc, libt_now() - svc->starttime);
-						mylog(LOG_WARNING, "%s '%s", svc_throttled(svc) ? "throttle" : "restart", svc->name);
+
+						if (svc_throttled(svc)) {
+							mylog(LOG_WARNING, "throttle '%s", svc->name);
+							svc->startmsg = "iterate";
+						} else
+							svc->startmsg = "restart";
 						libt_add_timeout(delay, exec_svc, svc);
 					}
 				}
