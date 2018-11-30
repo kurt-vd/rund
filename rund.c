@@ -357,6 +357,7 @@ static int cmd_add(int argc, char *argv[])
 	struct service *svc, *svc2;
 	int j, f, result = 0;
 	char *endp;
+	double delay = 0;
 
 	if (myuid && peeruid && (myuid != peeruid))
 		/* block on regular user mismatch */
@@ -398,6 +399,9 @@ static int cmd_add(int argc, char *argv[])
 		} else if (!svc->argv && !strncmp("INTERVAL=", argv[j], 9)) {
 			svc->interval = strtod(argv[j]+9, NULL);
 			svc->flags |= FL_INTERVAL;
+			continue;
+		} else if (!svc->argv && !strncmp("DELAY=", argv[j], 6)) {
+			delay = strtod(argv[j]+6, NULL);
 			continue;
 		} else if (!strncmp("PID=", argv[j], 4)) {
 			/* it is way more complicated to allow this for non-root
@@ -459,10 +463,20 @@ static int cmd_add(int argc, char *argv[])
 	/* add in linked list */
 	svc->next = svcs;
 	svcs = svc;
-	mylog(LOG_INFO, "%s '%s'", svc->pid ? "import" : "add", svc->name);
-	/* exec now */
-	if (!svc->pid && !(svc->flags & FL_PAUSED))
+	/* decide to start */
+	if (svc->pid)
+		mylog(LOG_INFO, "import '%s'", svc->name);
+	else if (delay > 0) {
+		/* schedule initial delay */
+		mylog(LOG_INFO, "scheduled '%s'", svc->name);
+		libt_add_timeout(delay, exec_svc, svc);
+	} else if (svc->flags & FL_PAUSED) {
+		mylog(LOG_INFO, "declared '%s'", svc->name);
+	} else {
+		mylog(LOG_INFO, "add '%s'", svc->name);
+		/* exec now */
 		exec_svc(svc);
+	}
 	return svc->pid;
 failed:
 	if (svc->args) {
@@ -512,9 +526,14 @@ static struct service *find_svc3(struct service *svcs, char *args[], int accept_
 			if (!strcmp(args[j], svc->name))
 				/* argument may be name */
 				continue;
-			for (k = 0; svc->args[k]; ++k)
+			for (k = 0; svc->args[k]; ++k) {
 				if (!strcmp(args[j], svc->args[k]))
 					break;
+				if (svc->args+k < svc->argv && !strncmp(svc->args[k], "NAME=", 5) &&
+						!strcmp(svc->args[k]+5, args[j]))
+						/* match any NAME=xxx environment variable*/
+						break;
+			}
 			if (!svc->args[k])
 				goto nomatch;
 		}

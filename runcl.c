@@ -53,6 +53,7 @@ static const char help_msg[] =
 	"	USER=	to run as different user\n"
 	"	KILL=[GRP][,HARD] Add group-kill and/or hard-kill delays\n"
 	"	INTERVAL=	to run with intervals\n"
+	"	DELAY=		to wait a little before running\n"
 	"	PAUSED=1	to start suspended\n"
 	"	ONESHOT=1	to start a single run\n"
 	" remove [KEY=VALUE ...] [PROGRAM] [ARGUMENT ...]\n"
