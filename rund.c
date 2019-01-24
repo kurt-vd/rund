@@ -670,12 +670,13 @@ static int cmd_pause(int argc, char *argv[])
 					libt_add_timeout(svckillharddelay(svc), killhard, svc);
 			}
 			++ndone;
-		} else if (!pause && (svc->flags & FL_PAUSED) && !svc->pid) {
+		} else if (!pause && (svc->flags & FL_PAUSED)) {
 			svc->flags &= ~FL_PAUSED;
 			fibonacci_reset(svc->delay);
-			libt_add_timeout(0, exec_svc, svc);
-			++ndone;
+			if (!svc->pid)
+				libt_add_timeout(0, exec_svc, svc);
 			svc->startmsg = "resume";
+			++ndone;
 		}
 	}
 	return ndone ?: -err;
