@@ -60,8 +60,6 @@ static const char help_msg[] =
 	"	Remove a service\n"
 	" remove *\n"
 	"	Remove all services\n"
-	" removing [KEY=VALUE ...] [PROGRAM] [ARGUMENT ...]\n"
-	"	Count the number of removed services that are yet exiting\n"
 	" reload [KEY=VALUE ...] [PRORAM] [ARGUMENT ...]\n"
 	" pause|suspend [KEY=VALUE ...] [PRORAM] [ARGUMENT ...]\n"
 	"	Stops a service, but do not forget about it\n"
