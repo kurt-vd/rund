@@ -531,10 +531,23 @@ static struct service *find_svc3(struct service *svcs, char *args[], int accept_
 			if (!strcmp(args[j], svc->name))
 				/* argument may be name */
 				continue;
+			if (!strncmp(args[j], "PID=", 4)) {
+				if (strtoul(args[j]+4, NULL, 0) != svc->pid)
+					goto nomatch;
+				continue;
+			}
+			if (!strcmp(args[j], "REMOVING=1")) {
+				if (!(svc->flags & FL_REMOVE))
+					goto nomatch;
+				continue;
+			}
+			if (!strcmp(args[j], "PAUSING=1")) {
+				if (!(svc->flags & FL_PAUSED) || !svc->pid)
+					goto nomatch;
+				continue;
+			}
 			for (k = 0; svc->args[k]; ++k) {
 				if (!strcmp(args[j], svc->args[k]))
-					break;
-				if (!strcmp(args[j], "PAUSING=1") && (svc->flags & FL_PAUSED) && svc->pid)
 					break;
 				if (svc->args+k < svc->argv && !strncmp(svc->args[k], "NAME=", 5) &&
 						!strcmp(svc->args[k]+5, args[j]))
