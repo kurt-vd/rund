@@ -622,20 +622,6 @@ static int cmd_remove(int argc, char *argv[])
 	return ndone ?: err;
 }
 
-static int cmd_removing(int argc, char *argv[])
-{
-	struct service *svc;
-	int ndone = 0;
-
-	for (svc = find_svc3(svcs, argv+1, 1); svc; svc = find_svc3(svc->next, argv+1, 1)) {
-		if (peeruid && (svc->uid != peeruid))
-			continue;
-		if (svc->flags & FL_REMOVE)
-			++ndone;
-	}
-	return ndone;
-}
-
 static int cmd_reload(int argc, char *argv[])
 {
 	struct service *svc;
@@ -910,7 +896,6 @@ struct cmd {
 	{ "watchdog", cmd_watchdog, },
 	{ "add", cmd_add, },
 	{ "remove", cmd_remove, },
-	{ "removing", cmd_removing, },
 	{ "reload", cmd_reload, },
 	{ "pause", cmd_pause, },
 	{ "suspend", cmd_pause, },

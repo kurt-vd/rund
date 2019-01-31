@@ -21,7 +21,7 @@ dd if=/dev/urandom of=/var/cache/random-seed iflag=nonblock count=1 bs=512 2>/de
 
 echo [`ktstamp -k`] Kill services
 runcl remove "*"
-runcl -r0.25 -m10 removing
+runcl -r0.25 -m10 status -qsx REMOVING=1
 
 echo [`ktstamp -k`] Kill remaining processes
 
