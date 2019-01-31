@@ -814,6 +814,8 @@ static int cmd_status(int argc, char *argv[])
 			bufp += sprintf(bufp, "REMOVING=1") +1;
 		if (svc->flags & FL_PAUSED)
 			bufp += sprintf(bufp, "PAUSED=1") +1;
+		if (svc->flags & FL_PAUSED && svc->pid)
+			bufp += sprintf(bufp, "PAUSING=1") +1;
 		if (svc->flags & FL_KILLSPEC) {
 			bufp += sprintf(bufp, "KILL=");
 			if (svc->killgrpdelay)
