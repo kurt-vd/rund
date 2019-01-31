@@ -1071,16 +1071,18 @@ int main(int argc, char *argv[])
 					}
 					if (!svc)
 						continue;
+					/* remove scheduled kill's */
+					libt_remove_timeout(killgrp, svc);
+					libt_remove_timeout(killhard, svc);
 					/* found svc */
 					svc->pid = 0;
+
 					if (svc->flags & (FL_REMOVE | FL_ONESHOT)) {
 						if (!(svc->flags & FL_REMOVE))
 							/* notify 'unexpected' end */
 							mylog(LOG_WARNING, "'%s' ended", svc->name);
 						else
 							mylog(LOG_INFO, "removed '%s'", svc->name);
-						libt_remove_timeout(killgrp, svc);
-						libt_remove_timeout(killhard, svc);
 						cleanup_svc(svc);
 
 					} else if (svc->flags & FL_PAUSED) {
