@@ -777,6 +777,11 @@ static int cmd_status(int argc, char *argv[])
 	/* add watchdogs */
 	for (wdt = wdts; wdt; wdt = wdt->next) {
 		bufp = sbuf;
+		if (strchr(options, 'q')) {
+			/* quiet operation */
+			++ndone;
+			continue;
+		}
 		*bufp++ = '>';
 		if (strchr(options, 'd')) {
 			bufp += sprintf(bufp, "watchdog") +1;
@@ -799,6 +804,11 @@ static int cmd_status(int argc, char *argv[])
 		if (peeruid && (svc->uid != peeruid)) {
 			/* change returned error into 'permission ...' */
 			err = EPERM;
+			continue;
+		}
+		if (strchr(options, 'q')) {
+			/* quiet operation */
+			++ndone;
 			continue;
 		}
 		bufp = sbuf;
