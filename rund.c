@@ -534,6 +534,8 @@ static struct service *find_svc3(struct service *svcs, char *args[], int accept_
 			for (k = 0; svc->args[k]; ++k) {
 				if (!strcmp(args[j], svc->args[k]))
 					break;
+				if (!strcmp(args[j], "PAUSING=1") && (svc->flags & FL_PAUSED) && svc->pid)
+					break;
 				if (svc->args+k < svc->argv && !strncmp(svc->args[k], "NAME=", 5) &&
 						!strcmp(svc->args[k]+5, args[j]))
 						/* match any NAME=xxx environment variable*/
