@@ -37,6 +37,8 @@ static const char help_msg[] =
 	"Options:\n"
 	" -V	Show version\n"
 	" -q	Quiet, don't print replies\n"
+	" -Q	Quiet bis, don't print failures\n"
+	"	To be used to just issue a command without expectations\n"
 	" -r[DELAY]	Repeat command each DELAY secs (default 1.0)\n"
 	"		until 0 is returned\n"
 	" -mDELAY	Repeat Maximum during DELAY secs\n"
@@ -88,7 +90,7 @@ static const char help_msg[] =
 	"	that were removed, which keeps the filesystem busy\n"
 	"	for writing\n"
 	;
-static const char optstring[] = "+?Vqr::m:s:";
+static const char optstring[] = "+?VqQr::m:s:";
 
 /* comm timeout */
 static void sigalrm(int sig)
@@ -150,7 +152,7 @@ int main(int argc, char *argv[])
 	double repeat = NAN;
 	int maxdelay = 0;
 	time_t t0;
-	int quiet;
+	int quiet, quietbis;
 
 	/* prepare cmd */
 	static char sbuf[16*1024], rbuf[16*1024];
@@ -158,6 +160,7 @@ int main(int argc, char *argv[])
 
 	/* assume quiet operation on non-terminal invocation */
 	quiet = !ttytest();
+	quietbis = 0;
 	/* parse program options */
 	while ((opt = getopt(argc, argv, optstring)) != -1)
 	switch (opt) {
@@ -166,6 +169,9 @@ int main(int argc, char *argv[])
 		return 0;
 	case 'q':
 		quiet = 1;
+		break;
+	case 'Q':
+		quietbis = 1;
 		break;
 	case 'r':
 		repeat = optarg ? strtod(optarg, NULL) : 1;
@@ -257,15 +263,18 @@ int main(int argc, char *argv[])
 			alarm(1);
 		} while (1);
 		ret = strtol(rbuf, NULL, 0);
-		if (ret < 0)
-			mylog(LOG_ERR, "command failed: %s", ESTR(-ret));
+		if (ret < 0) {
+			if (!quietbis)
+				mylog(LOG_ERR, "command failed: %s", ESTR(-ret));
+			exit(1);
+		}
 		if (isnan(repeat)) {
 			if (!quiet)
 				printf("%i\n", ret);
 			break;
 		}
 		if (maxdelay && (!ret || (time(NULL) > (t0+maxdelay)))) {
-			if (!quiet)
+			if (!quiet && !quietbis)
 				mylog(LOG_INFO, "%s %s after %lu seconds", sbuf,
 					ret ? "aborted" : "finished",
 					time(NULL)-t0);
