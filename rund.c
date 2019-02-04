@@ -592,7 +592,7 @@ static int cmd_remove(int argc, char *argv[])
 {
 	struct service *svc, *nsvc;
 	int ndone = 0;
-	int err = -ENOENT;
+	int err = ENOENT;
 
 	if (!argv[1])
 		/* do not 'implicitely' remove all svcs */
@@ -619,7 +619,7 @@ static int cmd_remove(int argc, char *argv[])
 		}
 		++ndone;
 	}
-	return ndone ?: err;
+	return ndone ?: -err;
 }
 
 static int cmd_reload(int argc, char *argv[])
