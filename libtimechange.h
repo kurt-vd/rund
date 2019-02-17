@@ -34,11 +34,7 @@ static inline
 int libtimechange_arm(int fd)
 {
 	/* schedule timerfd */
-	struct itimerspec spec = {
-		.it_value = {
-			.tv_sec = ~0,
-		},
-	};
+	struct itimerspec spec = {};
 	return timerfd_settime(fd, TFD_TIMER_ABSTIME | TFD_TIMER_CANCEL_ON_SET, &spec, NULL);
 }
 
