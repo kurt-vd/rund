@@ -19,6 +19,11 @@
 #include <stdint.h>
 #include <sys/timerfd.h>
 
+/* TFD_TIMER_CANCEL_ON_SET is relatively new ... */
+#ifndef TFD_TIMER_CANCEL_ON_SET
+#define TFD_TIMER_CANCEL_ON_SET (1 << 1)
+#endif
+
 static inline
 int libtimechange_makefd(void)
 {
