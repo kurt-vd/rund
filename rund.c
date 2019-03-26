@@ -643,11 +643,12 @@ static int cmd_reload(int argc, char *argv[], int cookie)
 	return ndone ?: -err;
 }
 
+#define COOKIE_PAUSE	1
+#define COOKIE_RESUME	2
 static int cmd_pause(int argc, char *argv[], int cookie)
 {
 	struct service *svc;
 	int ndone = 0, err = 0;
-	int pause = strcmp("resume", argv[0]) != 0;
 
 	if (!argv[1])
 		/* do not 'implicitely' pause all svcs */
@@ -658,7 +659,7 @@ static int cmd_pause(int argc, char *argv[], int cookie)
 			err = EPERM;
 			continue;
 		}
-		if (pause && !(svc->flags & FL_PAUSED)) {
+		if ((cookie & COOKIE_PAUSE) && !(svc->flags & FL_PAUSED)) {
 			mylog(LOG_INFO, "pause '%s'", svc->name);
 			svc->flags |= FL_PAUSED;
 			libt_remove_timeout(exec_svc, svc);
@@ -671,7 +672,8 @@ static int cmd_pause(int argc, char *argv[], int cookie)
 					libt_add_timeout(svckillharddelay(svc), killhard, svc);
 			}
 			++ndone;
-		} else if (!pause && (svc->flags & FL_PAUSED)) {
+		}
+		if ((cookie & COOKIE_RESUME) && (svc->flags & FL_PAUSED)) {
 			svc->flags &= ~FL_PAUSED;
 			fibonacci_reset(svc->delay);
 			if (!svc->pid)
@@ -906,9 +908,10 @@ struct cmd {
 	{ "add", cmd_add, },
 	{ "remove", cmd_remove, },
 	{ "reload", cmd_reload, },
-	{ "pause", cmd_pause, },
-	{ "suspend", cmd_pause, },
-	{ "resume", cmd_pause, },
+	{ "pause", cmd_pause, COOKIE_PAUSE, },
+	{ "suspend", cmd_pause, COOKIE_PAUSE, },
+	{ "resume", cmd_pause, COOKIE_RESUME, },
+	{ "restart", cmd_pause, COOKIE_PAUSE | COOKIE_RESUME, },
 	/* management commands */
 	{ "maxthrottle", cmd_maxthrottle, },
 	{ "setkill", cmd_setkill, },
