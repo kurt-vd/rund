@@ -133,7 +133,7 @@ static void do_watchdog(void *dat)
 	libt_add_timeout(wdt->timeout/2.0, do_watchdog, wdt);
 }
 
-static int cmd_watchdog(int argc, char *argv[])
+static int cmd_watchdog(int argc, char *argv[], int cookie)
 {
 	struct wdt *wdt, **pwdt;
 	int ret;
@@ -356,7 +356,7 @@ static struct service *svc_exists(struct service *dut)
 	return NULL;
 }
 
-static int cmd_add(int argc, char *argv[])
+static int cmd_add(int argc, char *argv[], int cookie)
 {
 	struct service *svc, *svc2;
 	int j, f, result = 0;
@@ -588,7 +588,7 @@ static void killgrp(void *dat)
 		libt_add_timeout(svckillharddelay(svc), killhard, svc);
 }
 
-static int cmd_remove(int argc, char *argv[])
+static int cmd_remove(int argc, char *argv[], int cookie)
 {
 	struct service *svc, *nsvc;
 	int ndone = 0;
@@ -622,7 +622,7 @@ static int cmd_remove(int argc, char *argv[])
 	return ndone ?: -err;
 }
 
-static int cmd_reload(int argc, char *argv[])
+static int cmd_reload(int argc, char *argv[], int cookie)
 {
 	struct service *svc;
 	int ndone = 0, err = 0;
@@ -643,7 +643,7 @@ static int cmd_reload(int argc, char *argv[])
 	return ndone ?: -err;
 }
 
-static int cmd_pause(int argc, char *argv[])
+static int cmd_pause(int argc, char *argv[], int cookie)
 {
 	struct service *svc;
 	int ndone = 0, err = 0;
@@ -683,7 +683,7 @@ static int cmd_pause(int argc, char *argv[])
 	return ndone ?: -err;
 }
 
-static int cmd_syslog(int argc, char *argv[])
+static int cmd_syslog(int argc, char *argv[], int cookie)
 {
 	if (myuid != (peeruid ?: myuid))
 		return -EPERM;
@@ -701,7 +701,7 @@ static int cmd_syslog(int argc, char *argv[])
 	return 0;
 }
 
-static int cmd_loglevel(int argc, char *argv[])
+static int cmd_loglevel(int argc, char *argv[], int cookie)
 {
 	if (myuid != (peeruid ?: myuid))
 		return -EPERM;
@@ -712,7 +712,7 @@ static int cmd_loglevel(int argc, char *argv[])
 	return loglevel;
 }
 
-static int cmd_redir(int argc, char *argv[])
+static int cmd_redir(int argc, char *argv[], int cookie)
 {
 	int ret, fd;
 
@@ -740,7 +740,7 @@ static int cmd_redir(int argc, char *argv[])
 	return ret;
 }
 
-static int cmd_env(int argc, char *argv[])
+static int cmd_env(int argc, char *argv[], int cookie)
 {
 	char *valstr;
 
@@ -761,7 +761,7 @@ static int cmd_env(int argc, char *argv[])
 }
 
 static char sbuf[16*1024];
-static int cmd_status(int argc, char *argv[])
+static int cmd_status(int argc, char *argv[], int cookie)
 {
 	struct service *svc;
 	struct wdt *wdt;
@@ -848,7 +848,7 @@ static int cmd_status(int argc, char *argv[])
 	return ndone ?: -err;
 }
 
-static int cmd_exec(int argc, char *argv[])
+static int cmd_exec(int argc, char *argv[], int cookie)
 {
 	if (myuid != (peeruid ?: myuid))
 		return -EPERM;
@@ -866,7 +866,7 @@ static int cmd_exec(int argc, char *argv[])
 }
 
 static double maxthrottle = INFINITY;
-static int cmd_maxthrottle(int argc, char *argv[])
+static int cmd_maxthrottle(int argc, char *argv[], int cookie)
 {
 	double value;
 
@@ -882,7 +882,7 @@ static int cmd_maxthrottle(int argc, char *argv[])
 	return 0;
 }
 
-static int cmd_setkill(int argc, char *argv[])
+static int cmd_setkill(int argc, char *argv[], int cookie)
 {
 	if (argc <= 1)
 		return -EINVAL;
@@ -899,7 +899,8 @@ static int cmd_setkill(int argc, char *argv[])
 /* remote commands */
 struct cmd {
 	const char *name;
-	int (*fn)(int argc, char *argv[]);
+	int (*fn)(int argc, char *argv[], int cookie);
+	int cookie;
 } static const cmds[] = {
 	{ "watchdog", cmd_watchdog, },
 	{ "add", cmd_add, },
@@ -1138,7 +1139,7 @@ int main(int argc, char *argv[])
 			case SIGHUP:
 				/* retry throttled services */
 				mylog(LOG_INFO, "reload ...");
-				cmd_reload(2, (char *[]){ "reload", "*", NULL, });
+				cmd_reload(2, (char *[]){ "reload", "*", NULL, }, 0);
 				break;
 			}
 		}
@@ -1192,7 +1193,7 @@ int main(int argc, char *argv[])
 			}
 			/* run command */
 			peernamelen = msg.msg_namelen;
-			ret = cmd->fn(nargs, args);
+			ret = cmd->fn(nargs, args, cmd->cookie);
 sock_reply:
 			if (!msg.msg_namelen)
 				/* anonymous socket, skip reply */
