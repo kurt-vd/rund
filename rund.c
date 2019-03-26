@@ -673,7 +673,7 @@ static int cmd_pause(int argc, char *argv[], int cookie)
 			}
 			++ndone;
 		}
-		if ((cookie & COOKIE_RESUME) && (svc->flags & FL_PAUSED)) {
+		if ((cookie & COOKIE_RESUME) && ((svc->flags & FL_PAUSED) || !svc->pid)) {
 			svc->flags &= ~FL_PAUSED;
 			fibonacci_reset(svc->delay);
 			if (!svc->pid)
