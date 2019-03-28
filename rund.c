@@ -660,7 +660,7 @@ static int cmd_pause(int argc, char *argv[], int cookie)
 			continue;
 		}
 		if ((cookie & COOKIE_PAUSE) && !(svc->flags & FL_PAUSED)) {
-			mylog(LOG_INFO, "pause '%s'", svc->name);
+			mylog(LOG_INFO, "stop '%s'", svc->name);
 			svc->flags |= FL_PAUSED;
 			libt_remove_timeout(exec_svc, svc);
 			if (svc->pid) {
@@ -678,7 +678,7 @@ static int cmd_pause(int argc, char *argv[], int cookie)
 			fibonacci_reset(svc->delay);
 			if (!svc->pid)
 				libt_add_timeout(0, exec_svc, svc);
-			svc->startmsg = "resume";
+			svc->startmsg = "start";
 			++ndone;
 		}
 	}
@@ -911,6 +911,8 @@ struct cmd {
 	{ "pause", cmd_pause, COOKIE_PAUSE, },
 	{ "suspend", cmd_pause, COOKIE_PAUSE, },
 	{ "resume", cmd_pause, COOKIE_RESUME, },
+	{ "stop", cmd_pause, COOKIE_PAUSE, },
+	{ "start", cmd_pause, COOKIE_RESUME, },
 	{ "restart", cmd_pause, COOKIE_PAUSE | COOKIE_RESUME, },
 	/* management commands */
 	{ "maxthrottle", cmd_maxthrottle, },
