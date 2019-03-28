@@ -582,7 +582,7 @@ static void killgrp(void *dat)
 {
 	struct service *svc = dat;
 
-	mylog(LOG_INFO, "stop-grp '%s'", svc->name);
+	mylog(LOG_INFO, "kill-grp '%s'", svc->name);
 	kill(-svc->pid, SIGTERM);
 	if (svckillharddelay(svc))
 		libt_add_timeout(svckillharddelay(svc), killhard, svc);
@@ -605,7 +605,7 @@ static int cmd_remove(int argc, char *argv[], int cookie)
 			continue;
 		}
 		if (svc->pid) {
-			mylog(LOG_INFO, "stop '%s'", svc->name);
+			mylog(LOG_INFO, "kill '%s'", svc->name);
 			kill(svc->pid, SIGTERM);
 			svc->flags |= FL_REMOVE;
 			if (svckillgrpdelay(svc))
@@ -664,7 +664,7 @@ static int cmd_pause(int argc, char *argv[], int cookie)
 			svc->flags |= FL_PAUSED;
 			libt_remove_timeout(exec_svc, svc);
 			if (svc->pid) {
-				mylog(LOG_INFO, "stop '%s'", svc->name);
+				mylog(LOG_INFO, "kill '%s'", svc->name);
 				kill(svc->pid, SIGTERM);
 				if (svckillgrpdelay(svc))
 					libt_add_timeout(svckillgrpdelay(svc), killgrp, svc);
