@@ -6,14 +6,14 @@
 
 #include "brlib.h"
 
-void br_clean_uri(struct uri *p)
+void lib_clean_uri(struct uri *p)
 {
 	if (p->params)
 		free(p->params);
 	memset(p, 0, sizeof(*p));
 }
 
-const char *br_uri_param(struct uri *p, const char *key)
+const char *lib_uri_param(struct uri *p, const char *key)
 {
 	int j;
 
@@ -25,7 +25,7 @@ const char *br_uri_param(struct uri *p, const char *key)
 	return NULL;
 }
 
-void br_parse_uri(const char *uri, struct uri *p)
+void lib_parse_uri(const char *uri, struct uri *p)
 {
 	static char *copy;
 	static char *hoststr;
