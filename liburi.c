@@ -53,9 +53,11 @@ void lib_parse_uri(const char *uri, struct uri *p)
 			if (p->nparams +2 > p->sparams) {
 				p->sparams += 16;
 				p->params = realloc(p->params, sizeof(void *)*p->sparams);
+#if 0
 				if (!p->params)
-					br_log(LOG_EXIT | LOG_ERR, "realloc %u params: %s",
+					mylog(LOG_ERR, "realloc %u params: %s",
 							p->sparams, ESTR(errno));
+#endif
 			}
 			p->params[p->nparams++] = str;
 			str = strchr(str, '=');
