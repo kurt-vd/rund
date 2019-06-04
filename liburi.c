@@ -106,6 +106,12 @@ void lib_parse_uri(const char *uri, struct uri *p)
 	}
 
 	if (*str == ':') {
+		if (!strchr(str+1, '/') && strchr(str+1, ':')) {
+			/* multiple ::, no /, suspect ipv6 hostname */
+			if (*uri)
+				p->host = uri;
+			goto done;
+		}
 		*str = 0;
 		if (str > uri)
 			/* save host */
