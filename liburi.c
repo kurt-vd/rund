@@ -4,7 +4,7 @@
 
 #include <syslog.h>
 
-#include "brlib.h"
+#include "liburi.h"
 
 void lib_clean_uri(struct uri *p)
 {
