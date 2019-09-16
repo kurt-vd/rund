@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 
 #include <unistd.h>
@@ -40,6 +41,10 @@ static const char help_msg[] =
 	"			TYPE is one of as, core, cpu, data, fsize, memlock, msgqueue,\n"
 	"			nice, nofile, nproc, rss, rtprio, rttime, sigpending, stack\n"
 	" ionice:CLASS,VALUE	set io nice class (none,rt,be,idle) and value\n"
+	" sched:P[F][,V1[,V2[,V3]]] Set scheduling.\n"
+	"			P is other, fifo, rr, batch, idle, deadline\n"
+	"			for fifo and rr, add static priority\n"
+	"			for deadline, add runtime[,deadline],period\n"
 	" KEY=VALUE		Set environment variables\n"
 	;
 
@@ -87,6 +92,40 @@ enum {
 
 #define IOPRIO_PRIO_VALUE(class, prio)  ((class << 13) | (prio & 0x1fff))
 #endif
+
+
+#define SCHED_NORMAL	0
+#define SCHED_FIFO	1
+#define SCHED_RR	2
+#define SCHED_BATCH	3
+#define SCHED_IDLE	5
+#define SCHED_DEADLINE	6
+#define SCHED_FLAG_RESET_ON_FORK 1
+
+struct sched_attr {
+       uint32_t size;
+
+       uint32_t sched_policy;
+       uint64_t sched_flags;
+
+       /* SCHED_NORMAL, SCHED_BATCH */
+       int32_t sched_nice;
+
+       /* SCHED_FIFO, SCHED_RR */
+       uint32_t sched_priority;
+
+       /* SCHED_DEADLINE (nsec) */
+       uint64_t sched_runtime;
+       uint64_t sched_deadline;
+       uint64_t sched_period;
+};
+
+int sched_setattr(pid_t pid,
+		const struct sched_attr *attr,
+		unsigned int flags)
+{
+	return syscall(__NR_sched_setattr, pid, attr, flags);
+}
 
 /* main process */
 int main(int argc, char *argv[])
@@ -193,6 +232,38 @@ int main(int argc, char *argv[])
 			opt = strtol(strtok(NULL, "") ?: "0", NULL, 0);
 			if (setpriority(PRIO_PROCESS, 0, opt) < 0)
 				mylog(LOG_ERR, "nice %i: %s", opt, ESTR(errno));
+		}
+		else if (!strcmp(tok, "sched")) {
+			struct sched_attr sa = {};
+			static const char policies[] = "ofrb_id";
+			/* find policy */
+			tok = strtok(NULL, ",") ?: "";
+			str = strchr(policies, *tok);
+			if (!str)
+				mylog(LOG_ERR, "scheduling policy '%s' unkown", tok);
+			sa.sched_policy = str - policies;
+			if (strchr(tok, 'R'))
+				sa.sched_flags |= SCHED_FLAG_RESET_ON_FORK;
+
+			switch (sa.sched_policy) {
+			case SCHED_FIFO:
+			case SCHED_RR:
+				sa.sched_priority = strtoul(strtok(NULL, ",") ?: "0", NULL, 0);
+				break;
+			case SCHED_DEADLINE:
+				sa.sched_runtime = strtod(strtok(NULL, ",") ?: "0", NULL) * 1e9;
+				sa.sched_period = strtod(strtok(NULL, ",") ?: "0", NULL) * 1e9;
+				tok = strtok(NULL, ",");
+				if (tok) {
+					sa.sched_deadline = sa.sched_period;
+					sa.sched_period = strtod(tok, NULL) * 1e9;
+				} else
+					sa.sched_deadline = (sa.sched_runtime + sa.sched_period)/2;
+				break;
+			}
+
+			if (sched_setattr(0, &sa, 0) < 0)
+				mylog(LOG_ERR, "sched_setattr %i failed: %s", sa.sched_policy, ESTR(errno));
 		}
 		else if (!strcmp(tok, "umask")) {
 			opt = strtoul(strtok(NULL, "") ?: "0", NULL, 8);
