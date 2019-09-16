@@ -96,6 +96,24 @@ enum {
 #endif
 
 /* modify scheduler: don't rely on libc implemenation */
+#ifndef __NR_sched_setattr
+/* XXX use the proper syscall numbers */
+#ifdef __x86_64__
+#define __NR_sched_setattr		314
+#define __NR_sched_getattr		315
+#endif
+
+#ifdef __i386__
+#define __NR_sched_setattr		351
+#define __NR_sched_getattr		352
+#endif
+
+#ifdef __arm__
+#define __NR_sched_setattr		380
+#define __NR_sched_getattr		381
+#endif
+
+#endif
 #define SCHED_NORMAL	0
 #define SCHED_FIFO	1
 #define SCHED_RR	2
