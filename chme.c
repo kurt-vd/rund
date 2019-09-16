@@ -115,7 +115,12 @@ int main(int argc, char *argv[])
 			struct rlimit limit;
 
 			getrlimit(opt, &limit);
-			limit.rlim_cur = strtoul(strtok(NULL, ":") ?: "0", NULL, 0);
+			limit.rlim_cur = strtoul(strtok(NULL, ":") ?: "0", &str, 0);
+			if (*str == 'k' || *str == 'K')
+				limit.rlim_cur *= 1024;
+			else if (*str == 'M')
+				limit.rlim_cur *= 1024 * 1024;
+
 			if (limit.rlim_cur > limit.rlim_max)
 				/* increase max too */
 				limit.rlim_max = limit.rlim_cur;
