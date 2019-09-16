@@ -7,6 +7,7 @@
 
 #include <unistd.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
 
 #define NAME "chme"
 
@@ -31,6 +32,9 @@ static const char help_msg[] =
 	"Options:\n"
 	" -V	Show version\n"
 	"Settings:\n"
+	" cd:DIR		chdir\n"
+	" umask:0XX		change umask\n"
+	" nice:VAL		set nice\n"
 	" lim:TYPE:VALUE	wrap setrlimit,\n"
 	"			TYPE is one of as, core, cpu, data, fsize, memlock, msgqueue,\n"
 	"			nice, nofile, nproc, rss, rtprio, rttime, sigpending, stack\n"
@@ -102,6 +106,12 @@ int main(int argc, char *argv[])
 			++argv;
 			break;
 		}
+		else if (!strcmp(tok, "cd")) {
+			tok = strtok(NULL, "") ?: "";
+
+			if (chdir(tok) < 0)
+				mylog(LOG_ERR, "chdir %s: %s", tok, ESTR(errno));
+		}
 		else if (!strcmp(tok, "lim")) {
 			tok = strtok(NULL, ":") ?: "";
 
@@ -128,6 +138,15 @@ int main(int argc, char *argv[])
 			if (setrlimit(opt, &limit) < 0)
 				mylog(LOG_ERR, "rlimit %s %lu %lu: %s", resnames[opt],
 						(long)limit.rlim_cur, (long)limit.rlim_max, ESTR(errno));
+		}
+		else if (!strcmp(tok, "nice")) {
+			opt = strtol(strtok(NULL, "") ?: "0", NULL, 0);
+			if (setpriority(PRIO_PROCESS, 0, opt) < 0)
+				mylog(LOG_ERR, "nice %i: %s", opt, ESTR(errno));
+		}
+		else if (!strcmp(tok, "umask")) {
+			opt = strtoul(strtok(NULL, "") ?: "0", NULL, 8);
+			umask(opt);
 		}
 		else
 			mylog(LOG_ERR, "uknown token %s, maybe forgot a '--'", tok);
