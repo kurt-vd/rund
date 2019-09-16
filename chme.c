@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
 		if (!strchr(*argv, ':'))
 			goto run;
 
-		tok = strtok(*argv, ":");
+		tok = estrtok(*argv, ":");
 		if (!tok)
 			mylog(LOG_ERR, "bad token '%s'", *argv);
 
@@ -209,7 +209,7 @@ int main(int argc, char *argv[])
 			break;
 		}
 		else if (!strcmp(tok, "cd")) {
-			tok = strtok(NULL, "") ?: "";
+			tok = estrtok(NULL, "") ?: "";
 
 			if (chdir(tok) < 0)
 				mylog(LOG_ERR, "chdir %s: %s", tok, ESTR(errno));
@@ -219,7 +219,7 @@ int main(int argc, char *argv[])
 			int inv = 0, c1, c2;
 
 			CPU_ZERO(&cs);
-			for (tok = strtok(NULL, ","); tok; tok = strtok(NULL, ",")) {
+			for (tok = estrtok(NULL, ","); tok; tok = estrtok(NULL, ",")) {
 				if (*tok == '~' && !CPU_COUNT(&cs)) {
 					++tok;
 					inv = 1;
@@ -247,7 +247,7 @@ int main(int argc, char *argv[])
 				[IOPRIO_CLASS_IDLE] = "idle",
 			};
 			/* find priority class */
-			tok = strtok(NULL, ",") ?: "";
+			tok = estrtok(NULL, ",") ?: "";
 			for (opt = 0; opt < ARRAY_SIZE(ioprios); ++opt) {
 				if (!strcmp(ioprios[opt] ?: "", tok))
 					break;
@@ -255,14 +255,14 @@ int main(int argc, char *argv[])
 			if (opt >= ARRAY_SIZE(ioprios))
 				mylog(LOG_ERR, "ioprio class '%s' unknown", tok);
 			/* find value */
-			int val = strtol(strtok(NULL, ",") ?: "0", NULL, 0);
+			int val = strtol(estrtok(NULL, ",") ?: "0", NULL, 0);
 
 			/* commit value */
 			if (ioprio_set(IOPRIO_WHO_PROCESS, 0, IOPRIO_PRIO_VALUE(opt, val)) < 0)
 				mylog(LOG_ERR, "ioprio_set %s,%i: %s", ioprios[opt] ?: "", val, ESTR(errno));
 		}
 		else if (!strcmp(tok, "lim")) {
-			tok = strtok(NULL, ":") ?: "";
+			tok = estrtok(NULL, ":") ?: "";
 
 			for (opt = 0; opt < ARRAY_SIZE(resnames); ++opt) {
 				if (!strcmp(resnames[opt] ?: "", tok))
@@ -274,7 +274,7 @@ int main(int argc, char *argv[])
 			struct rlimit limit;
 
 			getrlimit(opt, &limit);
-			limit.rlim_cur = strtoul(strtok(NULL, ":") ?: "0", &str, 0);
+			limit.rlim_cur = strtoul(estrtok(NULL, ":") ?: "0", &str, 0);
 			if (*str == 'k' || *str == 'K')
 				limit.rlim_cur *= 1024;
 			else if (*str == 'M')
@@ -289,7 +289,7 @@ int main(int argc, char *argv[])
 						(long)limit.rlim_cur, (long)limit.rlim_max, ESTR(errno));
 		}
 		else if (!strcmp(tok, "nice")) {
-			opt = strtol(strtok(NULL, "") ?: "0", NULL, 0);
+			opt = strtol(estrtok(NULL, "") ?: "0", NULL, 0);
 			if (setpriority(PRIO_PROCESS, 0, opt) < 0)
 				mylog(LOG_ERR, "nice %i: %s", opt, ESTR(errno));
 		}
@@ -297,7 +297,7 @@ int main(int argc, char *argv[])
 			struct sched_attr sa = {};
 			static const char policies[] = "ofrb_id";
 			/* find policy */
-			tok = strtok(NULL, ",") ?: "";
+			tok = estrtok(NULL, ",") ?: "";
 			str = strchr(policies, *tok);
 			if (!str)
 				mylog(LOG_ERR, "scheduling policy '%s' unkown", tok);
@@ -308,12 +308,12 @@ int main(int argc, char *argv[])
 			switch (sa.sched_policy) {
 			case SCHED_FIFO:
 			case SCHED_RR:
-				sa.sched_priority = strtoul(strtok(NULL, ",") ?: "0", NULL, 0);
+				sa.sched_priority = strtoul(estrtok(NULL, ",") ?: "0", NULL, 0);
 				break;
 			case SCHED_DEADLINE:
-				sa.sched_runtime = strtod(strtok(NULL, ",") ?: "0", NULL) * 1e9;
-				sa.sched_period = strtod(strtok(NULL, ",") ?: "0", NULL) * 1e9;
-				tok = strtok(NULL, ",");
+				sa.sched_runtime = strtod(estrtok(NULL, ",") ?: "0", NULL) * 1e9;
+				sa.sched_period = strtod(estrtok(NULL, ",") ?: "0", NULL) * 1e9;
+				tok = estrtok(NULL, ",");
 				if (tok) {
 					sa.sched_deadline = sa.sched_period;
 					sa.sched_period = strtod(tok, NULL) * 1e9;
@@ -326,7 +326,7 @@ int main(int argc, char *argv[])
 				mylog(LOG_ERR, "sched_setattr %i failed: %s", sa.sched_policy, ESTR(errno));
 		}
 		else if (!strcmp(tok, "umask")) {
-			opt = strtoul(strtok(NULL, "") ?: "0", NULL, 8);
+			opt = strtoul(estrtok(NULL, "") ?: "0", NULL, 8);
 			umask(opt);
 		}
 		else
