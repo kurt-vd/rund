@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 
 #define NAME "chme"
 
@@ -38,6 +39,7 @@ static const char help_msg[] =
 	" lim:TYPE:VALUE	wrap setrlimit,\n"
 	"			TYPE is one of as, core, cpu, data, fsize, memlock, msgqueue,\n"
 	"			nice, nofile, nproc, rss, rtprio, rttime, sigpending, stack\n"
+	" ionice:CLASS,VALUE	set io nice class (none,rt,be,idle) and value\n"
 	" KEY=VALUE		Set environment variables\n"
 	;
 
@@ -61,6 +63,30 @@ static const char *const resnames[] = {
 	[RLIMIT_SIGPENDING] = "sigpending",
 	[RLIMIT_STACK] = "stack",
 };
+
+#ifndef IOPRIO_CLASS_RT
+static inline int ioprio_set(int which, int who, int ioprio)
+{
+	return syscall(__NR_ioprio_set, which, who, ioprio);
+}
+static inline int ioprio_get(int which, int who)
+{
+	return syscall(__NR_ioprio_get, which, who);
+}
+enum {
+	IOPRIO_CLASS_NONE,
+	IOPRIO_CLASS_RT,
+	IOPRIO_CLASS_BE,
+	IOPRIO_CLASS_IDLE,
+};
+enum {
+	IOPRIO_WHO_PROCESS = 1,
+	IOPRIO_WHO_PGRP,
+	IOPRIO_WHO_USER,
+};
+
+#define IOPRIO_PRIO_VALUE(class, prio)  ((class << 13) | (prio & 0x1fff))
+#endif
 
 /* main process */
 int main(int argc, char *argv[])
@@ -113,6 +139,28 @@ int main(int argc, char *argv[])
 
 			if (chdir(tok) < 0)
 				mylog(LOG_ERR, "chdir %s: %s", tok, ESTR(errno));
+		}
+		else if (!strcmp(tok, "ionice")) {
+			static const char *const ioprios[] = {
+				[IOPRIO_CLASS_NONE] = "none",
+				[IOPRIO_CLASS_RT] = "rt",
+				[IOPRIO_CLASS_BE] = "be",
+				[IOPRIO_CLASS_IDLE] = "idle",
+			};
+			/* find priority class */
+			tok = strtok(NULL, ",") ?: "";
+			for (opt = 0; opt < ARRAY_SIZE(ioprios); ++opt) {
+				if (!strcmp(ioprios[opt] ?: "", tok))
+					break;
+			}
+			if (opt >= ARRAY_SIZE(ioprios))
+				mylog(LOG_ERR, "ioprio class '%s' unknown", tok);
+			/* find value */
+			int val = strtol(strtok(NULL, ",") ?: "0", NULL, 0);
+
+			/* commit value */
+			if (ioprio_set(IOPRIO_WHO_PROCESS, 0, IOPRIO_PRIO_VALUE(opt, val)) < 0)
+				mylog(LOG_ERR, "ioprio_set %s,%i: %s", ioprios[opt] ?: "", val, ESTR(errno));
 		}
 		else if (!strcmp(tok, "lim")) {
 			tok = strtok(NULL, ":") ?: "";
