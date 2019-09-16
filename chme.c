@@ -147,6 +147,21 @@ int sched_setattr(pid_t pid,
 	return syscall(__NR_sched_setattr, pid, attr, flags);
 }
 
+/* workaround empty strings in strtok */
+char *estrtok(char *haystack, const char *needle)
+{
+	static char *saved;
+	char *result;
+
+	result = saved = haystack ?: saved;
+	if (saved) {
+		saved = strpbrk(saved, needle);
+		if (saved)
+			*saved++ = 0;
+	}
+	return result;
+}
+
 /* main process */
 int main(int argc, char *argv[])
 {
