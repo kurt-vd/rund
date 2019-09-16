@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include <unistd.h>
+#include <sched.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -45,6 +46,7 @@ static const char help_msg[] =
 	"			P is other, fifo, rr, batch, idle, deadline\n"
 	"			for fifo and rr, add static priority\n"
 	"			for deadline, add runtime[,deadline],period\n"
+	" cpu:[~]CPU[-CPU2][,...]	Set cpu affinity mask\n"
 	" KEY=VALUE		Set environment variables\n"
 	;
 
@@ -93,7 +95,7 @@ enum {
 #define IOPRIO_PRIO_VALUE(class, prio)  ((class << 13) | (prio & 0x1fff))
 #endif
 
-
+/* modify scheduler: don't rely on libc implemenation */
 #define SCHED_NORMAL	0
 #define SCHED_FIFO	1
 #define SCHED_RR	2
@@ -178,6 +180,31 @@ int main(int argc, char *argv[])
 
 			if (chdir(tok) < 0)
 				mylog(LOG_ERR, "chdir %s: %s", tok, ESTR(errno));
+		}
+		else if (!strcmp(tok, "cpu")) {
+			cpu_set_t cs;
+			int inv = 0, c1, c2;
+
+			CPU_ZERO(&cs);
+			for (tok = strtok(NULL, ","); tok; tok = strtok(NULL, ",")) {
+				if (*tok == '~' && !CPU_COUNT(&cs)) {
+					++tok;
+					inv = 1;
+					memset(&cs, 0xff, sizeof(cs));
+				}
+
+				c1 = c2 = strtoul(tok, &str, 0);
+				if (str > tok && *tok == '-')
+					c2 = strtol(str+1, NULL, 0);
+				for (; c1 <= c2; ++c1)
+					if (inv)
+						CPU_CLR(c1, &cs);
+					else
+						CPU_SET(c1, &cs);
+			}
+
+			if (sched_setaffinity(0, sizeof(cs), &cs) < 0)
+				mylog(LOG_ERR, "sched_setaffinity: %s", ESTR(errno));
 		}
 		else if (!strcmp(tok, "ionice")) {
 			static const char *const ioprios[] = {
