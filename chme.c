@@ -7,6 +7,8 @@
 #include <string.h>
 
 #include <unistd.h>
+#include <grp.h>
+#include <pwd.h>
 #include <sched.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -37,6 +39,7 @@ static const char help_msg[] =
 	"Settings:\n"
 	" cd:DIR		chdir\n"
 	" umask:0XX		change umask\n"
+	" uid:[USR][:[GRP]:GRP,...] Set user/group/grouplist\n"
 	" nice:VAL		set nice\n"
 	" lim:TYPE:VALUE	wrap setrlimit,\n"
 	"			TYPE is one of as, core, cpu, data, fsize, memlock, msgqueue,\n"
@@ -324,6 +327,72 @@ int main(int argc, char *argv[])
 
 			if (sched_setattr(0, &sa, 0) < 0)
 				mylog(LOG_ERR, "sched_setattr %i failed: %s", sa.sched_policy, ESTR(errno));
+		}
+		else if (!strcmp(tok, "uid")) {
+			struct passwd *pw;
+			struct group *gr;
+			gid_t groups[128];
+			int ngroups;
+			int grouplistdone = 0;
+			int uid = -1, gid = -1;
+			char *uname = NULL, *gname = NULL;
+
+			tok = estrtok(NULL, ":");
+			if (tok && *tok) {
+				pw = (*tok == '#') ? getpwuid(strtoul(tok+1, NULL, 0)) : getpwnam(tok);
+				if (!pw)
+					mylog(LOG_ERR, "user '%s' not found", tok);
+				uid = pw->pw_uid;
+				gid = pw->pw_gid;
+				uname = strdup(tok);
+			}
+			tok = estrtok(NULL, ":");
+			if (tok && *tok) {
+				/* grab group info after resolving grouplist */
+				gr = (*tok == '#') ? getgrgid(strtoul(tok+1, NULL, 0)) : getgrnam(tok);
+				if (!gr)
+					mylog(LOG_ERR, "group '%s' not found", tok);
+				gid = gr->gr_gid;
+				gname = strdup(tok);
+			}
+			for (ngroups = 0, tok = estrtok(NULL, ","); tok; tok = estrtok(NULL, ",")) {
+				if (ngroups >= ARRAY_SIZE(groups))
+					mylog(LOG_ERR, "more than %u groups, refusing", ngroups);
+				grouplistdone = 1;
+				if (strlen(tok)) {
+					gr = (*tok == '#') ? getgrgid(strtoul(tok+1, NULL, 0)) : getgrnam(tok);
+					if (!gr)
+						mylog(LOG_ERR, "group '%s' not found", tok);
+					groups[ngroups++] = gr->gr_gid;
+				}
+			}
+			if (!grouplistdone && uname) {
+				/* load grouplist from passwd */
+				ngroups = ARRAY_SIZE(groups);
+				if (getgrouplist(uname, gid, groups, &ngroups) < 0)
+					mylog(LOG_ERR, "more than %u groups for %s, refusing", ngroups, uname);
+			}
+
+			/* perform actions */
+			if (gname) {
+				if (setgid(gid) < 0)
+					mylog(LOG_ERR, "setgid :%s failed: %s", gname, ESTR(errno));
+			} else if (uname) {
+				if (setgid(gid) < 0)
+					mylog(LOG_ERR, "setgid for %u failed: %s", gid, ESTR(errno));
+			}
+			if (uname || grouplistdone)
+				if (setgroups(ngroups, groups) < 0)
+					mylog(LOG_ERR, "setgroups failed: %s", ESTR(errno));
+
+			if (uname) {
+				if (setuid(uid) < 0)
+					mylog(LOG_ERR, "setuid %s failed: %s", uname, ESTR(errno));
+			}
+			if (uname)
+				free(uname);
+			if(gname);
+				free(gname);
 		}
 		else if (!strcmp(tok, "umask")) {
 			opt = strtoul(estrtok(NULL, "") ?: "0", NULL, 8);
