@@ -55,7 +55,9 @@ static const char *const resnames[] = {
 	[RLIMIT_NPROC] = "nproc",
 	[RLIMIT_RSS] = "rss",
 	[RLIMIT_RTPRIO] = "rtprio",
+#ifdef RLIMIT_RTTIME
 	[RLIMIT_RTTIME] = "rttime",
+#endif
 	[RLIMIT_SIGPENDING] = "sigpending",
 	[RLIMIT_STACK] = "stack",
 };
