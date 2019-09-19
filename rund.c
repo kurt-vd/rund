@@ -862,6 +862,7 @@ static int cmd_exec(int argc, char *argv[], int cookie)
 	if (sendto(sock, "0", 1, 0, (void *)&peername, peernamelen) < 0)
 		return -errno;
 
+	sigprocmask(SIG_SETMASK, &savedset, NULL);
 	execvp(argv[1], argv+1);
 	mylog(LOG_ERR, "execvp() failed: %s", ESTR(errno));
 	return -errno;
