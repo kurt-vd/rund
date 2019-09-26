@@ -1112,7 +1112,7 @@ int main(int argc, char *argv[])
 						double delay = svc_throttle_time(svc, libt_now() - svc->starttime);
 
 						if (svc_throttled(svc)) {
-							mylog(LOG_WARNING, "throttle '%s", svc->name);
+							mylog(LOG_WARNING, "throttle '%s'", svc->name);
 							svc->startmsg = "iterate";
 						} else
 							svc->startmsg = "restart";
