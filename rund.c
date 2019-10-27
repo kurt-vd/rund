@@ -136,7 +136,7 @@ static void do_watchdog(void *dat)
 static int cmd_watchdog(int argc, char *argv[], int cookie)
 {
 	struct wdt *wdt, **pwdt;
-	int ret;
+	int ret, result;
 	const char *device;
 
 	if (peeruid)
@@ -162,9 +162,26 @@ static int cmd_watchdog(int argc, char *argv[], int cookie)
 			}
 		}
 		return -ENOENT;
-	}
 
-	if (strcmp(argv[1], "add")) {
+	} else if (!strcmp(argv[1], "pause") || !strcmp(argv[1], "stop")) {
+		for (result = 0, wdt = wdts; wdt; wdt = wdt->next) {
+			if (!strcmp(wdt->file, device)) {
+				libt_remove_timeout(do_watchdog, wdt);
+				++result;
+			}
+		}
+		return result ?: -ENOENT;
+
+	} else if (!strcmp(argv[1], "resume") || !strcmp(argv[1], "start")) {
+		for (result = 0, wdt = wdts; wdt; wdt = wdt->next) {
+			if (!strcmp(wdt->file, device)) {
+				do_watchdog(wdt);
+				++result;
+			}
+		}
+		return result ?: -ENOENT;
+
+	} else if (strcmp(argv[1], "add")) {
 		mylog(LOG_WARNING, "unknown watchdog command '%s'", argv[1]);
 		return -EINVAL;
 	}
