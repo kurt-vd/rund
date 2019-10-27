@@ -149,7 +149,7 @@ static int cmd_watchdog(int argc, char *argv[], int cookie)
 
 	if (!strcmp(argv[1], "remove")) {
 		for (result = 0, pwdt = &wdts; *pwdt;) {
-			if (!strcmp((*pwdt)->file, device)) {
+			if (!strcmp((*pwdt)->file, device) || !strcmp(device, "all")) {
 				wdt = *pwdt;
 				/* remove from linked list */
 				*pwdt = (*pwdt)->next;
@@ -167,7 +167,7 @@ static int cmd_watchdog(int argc, char *argv[], int cookie)
 
 	} else if (!strcmp(argv[1], "pause") || !strcmp(argv[1], "stop")) {
 		for (result = 0, wdt = wdts; wdt; wdt = wdt->next) {
-			if (!strcmp(wdt->file, device)) {
+			if (!strcmp(wdt->file, device) || !strcmp(device, "all")) {
 				libt_remove_timeout(do_watchdog, wdt);
 				++result;
 			}
@@ -176,7 +176,7 @@ static int cmd_watchdog(int argc, char *argv[], int cookie)
 
 	} else if (!strcmp(argv[1], "resume") || !strcmp(argv[1], "start")) {
 		for (result = 0, wdt = wdts; wdt; wdt = wdt->next) {
-			if (!strcmp(wdt->file, device)) {
+			if (!strcmp(wdt->file, device) || !strcmp(device, "all")) {
 				do_watchdog(wdt);
 				++result;
 			}

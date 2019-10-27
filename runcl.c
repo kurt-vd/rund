@@ -47,7 +47,7 @@ static const char help_msg[] =
 	"Commands:\n"
 	" watchdog add DEVICE [TIMEOUT]\n"
 	"	Add a watchdog trigger with a specific timeout\n"
-	" watchdog remove|pause|stop|resume|start DEVICE\n"
+	" watchdog remove|pause|stop|resume|start DEVICE|all\n"
 	"	Remove, start or stop a watchdog\n"
 	"	A watchdog is started when added\n"
 	" add [KEY=VALUE ...] PROGRAM [ARGUMENT ...]\n"
