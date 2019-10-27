@@ -50,6 +50,8 @@ static const char help_msg[] =
 	" watchdog remove|pause|stop|resume|start DEVICE|all\n"
 	"	Remove, start or stop a watchdog\n"
 	"	A watchdog is started when added\n"
+	" watchdog change DEVICE TIMEOUT\n"
+	"	Change the timeout of a watchdog\n"
 	" add [KEY=VALUE ...] PROGRAM [ARGUMENT ...]\n"
 	"	Add a new service\n"
 	"	Special environment variables:\n"

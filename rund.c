@@ -183,6 +183,31 @@ static int cmd_watchdog(int argc, char *argv[], int cookie)
 		}
 		return result ?: -ENOENT;
 
+	} else if (!strcmp(argv[1], "change")) {
+		for (result = 0, wdt = wdts; wdt; wdt = wdt->next) {
+			if (!strcmp(wdt->file, device))
+				break;
+		}
+		if (!wdt)
+			return -ENOENT;
+		if (argc < 4)
+			return 0;
+		result = 0;
+
+		int timeout = strtoul(argv[3], 0, 0);
+		if (timeout != wdt->timeout) {
+			ret = ioctl(wdt->fd, WDIOC_SETTIMEOUT, &timeout);
+			if (ret < 0) {
+				mylog(LOG_ERR, "ioctl %s settimeout %i: %s", device,
+						timeout, ESTR(errno));
+				return -errno;
+			}
+			wdt->timeout = timeout;
+			do_watchdog(wdt);
+			++result;
+		}
+		return result;
+
 	} else if (strcmp(argv[1], "add")) {
 		mylog(LOG_WARNING, "unknown watchdog command '%s'", argv[1]);
 		return -EINVAL;
