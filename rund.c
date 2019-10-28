@@ -148,7 +148,7 @@ static int cmd_watchdog(int argc, char *argv[], int cookie)
 	device = argv[2];
 
 	if (!strcmp(argv[1], "remove")) {
-		for (pwdt = &wdts; *pwdt; pwdt = &(*pwdt)->next) {
+		for (result = 0, pwdt = &wdts; *pwdt;) {
 			if (!strcmp((*pwdt)->file, device)) {
 				wdt = *pwdt;
 				/* remove from linked list */
@@ -158,10 +158,12 @@ static int cmd_watchdog(int argc, char *argv[], int cookie)
 				write(wdt->fd, "V", 1);
 				close(wdt->fd);
 				free(wdt);
-				return 0;
+				++result;
+			} else {
+				pwdt = &(*pwdt)->next;
 			}
 		}
-		return -ENOENT;
+		return result ?: -ENOENT;
 
 	} else if (!strcmp(argv[1], "pause") || !strcmp(argv[1], "stop")) {
 		for (result = 0, wdt = wdts; wdt; wdt = wdt->next) {
