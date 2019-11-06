@@ -551,6 +551,10 @@ static struct service *find_svc3(struct service *svcs, char *args[], int accept_
 					goto nomatch;
 				continue;
 			}
+			if (!strncmp(args[j], "DELAY=", 6)) {
+				/* DELAY=XYZ is not saved, no test possible */
+				continue;
+			}
 			for (k = 0; svc->args[k]; ++k) {
 				if (!strcmp(args[j], svc->args[k]))
 					break;
