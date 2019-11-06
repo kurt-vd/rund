@@ -342,7 +342,8 @@ static struct service *svc_exists(struct service *dut)
 	for (svc = svcs; svc; svc = svc->next) {
 		if (svc->uid != dut->uid)
 			continue;
-		if (svc->flags & (FL_REMOVE | FL_ONESHOT))
+		if ((svc->flags & FL_REMOVE) ||
+				((svc->flags & FL_ONESHOT) && svc->pid))
 			/* ignore services about to be removed */
 			continue;
 
