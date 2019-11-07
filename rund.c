@@ -386,7 +386,8 @@ static struct service *svc_exists(struct service *dut)
 	for (svc = svcs; svc; svc = svc->next) {
 		if (svc->uid != dut->uid)
 			continue;
-		if (svc->flags & (FL_REMOVE | FL_ONESHOT))
+		if ((svc->flags & FL_REMOVE) ||
+				((svc->flags & FL_ONESHOT) && svc->pid))
 			/* ignore services about to be removed */
 			continue;
 
@@ -588,6 +589,15 @@ static struct service *find_svc3(struct service *svcs, char *args[], int accept_
 			if (!strcmp(args[j], "PAUSING=1")) {
 				if (!(svc->flags & FL_PAUSED) || !svc->pid)
 					goto nomatch;
+				continue;
+			}
+			if (!strcmp(args[j], "ONESHOT=1")) {
+				if (!(svc->flags & FL_ONESHOT))
+					goto nomatch;
+				continue;
+			}
+			if (!strncmp(args[j], "DELAY=", 6)) {
+				/* DELAY=XYZ is not saved, no test possible */
 				continue;
 			}
 			for (k = 0; svc->args[k]; ++k) {
