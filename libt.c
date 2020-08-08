@@ -277,7 +277,7 @@ double libt_timetointerval2(double interval, double offset)
 {
 	double value;
 
-	value = interval - fmod(libt_walltime() + offset, interval);
+	value = interval - fmod(libt_walltime() - offset, interval);
 
 	if (value < interval*0.05)
 		value += interval;
