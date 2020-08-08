@@ -22,6 +22,7 @@
 #include <time.h>
 #include <math.h>
 
+#include <sys/time.h>
 #include "libt.h"
 
 struct timer {
@@ -260,4 +261,25 @@ void libt_cleanup(void)
 		s.tmptimers = t->next;
 		free(t);
 	}
+}
+
+/* wall time functions */
+double libt_walltime(void)
+{
+	struct timeval t;
+	if (0 != gettimeofday(&t, 0))
+		return NAN;
+	return t.tv_sec + ((t.tv_usec % 1000000) / 1e6);
+}
+
+/* try to synchronise timeslices with walltime */
+double libt_timetointerval2(double interval, double offset)
+{
+	double value;
+
+	value = interval - fmod(libt_walltime() + offset, interval);
+
+	if (value < interval*0.05)
+		value += interval;
+	return value;
 }

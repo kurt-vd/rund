@@ -64,6 +64,24 @@ extern int libt_get_waittime(void);
  */
 extern void libt_cleanup(void);
 
+/* return walltime */
+extern double libt_walltime(void);
+
+/* return the time-to-wait for the next timeslice
+ * in walltime, so an interval can be synchronised to walltime
+ * i.e. to make an interval of 2m elapse on the first second
+ * of each even minute.
+ * offset is the offset to the interval,
+ * set -5 to wakeup 5sec before interval,
+ * or +5 to wakeup 5sec after interval
+ */
+extern double libt_timetointerval2(double interval, double offset);
+
+static inline double libt_timetointerval(double interval)
+{
+	return libt_timetointerval2(interval, 0);
+}
+
 #ifdef __cplusplus
 }
 #endif
