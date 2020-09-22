@@ -74,6 +74,9 @@ void lib_parse_uri(const char *uri, struct uri *p)
 		p->fragment = str;
 	}
 
+	if (*uri == '@' || *uri == '/')
+		goto unix_sock;
+
 	str = strchr(uri, '@');
 	if (str) {
 		*str++ = 0;
@@ -134,6 +137,7 @@ void lib_parse_uri(const char *uri, struct uri *p)
 		p->host = hoststr;
 		uri = str;
 	}
+unix_sock:
 	if (*uri)
 		/* save path */
 		p->path = uri;
