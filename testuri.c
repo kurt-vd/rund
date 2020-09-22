@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "brlib.h"
+#include "liburi.h"
 
 int main(int argc, char *argv[])
 {
@@ -8,7 +8,7 @@ int main(int argc, char *argv[])
 	for (j = 1; j < argc; ++j) {
 		struct uri uri = {};
 
-		br_parse_uri(argv[j], &uri);
+		lib_parse_uri(argv[j], &uri);
 		printf("%s\n", argv[j]);
 		printf("\t'%s' :// '%s' : '%s' @ '%s' : '%u' '%s' # '%s'",
 				uri.scheme ?: "",
