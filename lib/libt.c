@@ -22,6 +22,7 @@
 #include <time.h>
 #include <math.h>
 
+#include <sys/time.h>
 #include "libt.h"
 
 struct timer {
@@ -118,9 +119,16 @@ double libt_now(void)
 
 void libt_add_timeout(double timeout, void (*fn)(void *), const void *dat)
 {
+	if (isnan(timeout))
+		return;
+	libt_add_timeouta(timeout+libt_now(), fn, dat);
+}
+
+void libt_add_timeouta(double wakeuptime, void (*fn)(void *), const void *dat)
+{
 	struct timer *t;
 
-	if (isnan(timeout))
+	if (isnan(wakeuptime))
 		return;
 	t = t_find(fn, dat);
 	if (!t) {
@@ -133,7 +141,7 @@ void libt_add_timeout(double timeout, void (*fn)(void *), const void *dat)
 		t->fn = fn;
 		t->dat = (void *)dat;
 	}
-	t->wakeup = libt_now() + timeout;
+	t->wakeup = wakeuptime;
 	t_add_sorted(t, &s.timers);
 }
 
@@ -253,4 +261,25 @@ void libt_cleanup(void)
 		s.tmptimers = t->next;
 		free(t);
 	}
+}
+
+/* wall time functions */
+double libt_walltime(void)
+{
+	struct timeval t;
+	if (0 != gettimeofday(&t, 0))
+		return NAN;
+	return t.tv_sec + ((t.tv_usec % 1000000) / 1e6);
+}
+
+/* try to synchronise timeslices with walltime */
+double libt_timetointerval2(double interval, double offset)
+{
+	double value;
+
+	value = interval - fmod(libt_walltime() - offset, interval);
+
+	if (value < interval*0.05)
+		value += interval;
+	return value;
 }
