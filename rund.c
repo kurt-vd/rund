@@ -22,6 +22,7 @@
 #include <linux/watchdog.h>
 
 #include "lib/libt.h"
+#include "lib/libtimechange.h"
 
 #define NAME "rund"
 
@@ -259,6 +260,7 @@ struct service {
 		#define FL_PAUSED	0x04
 		#define FL_KILLSPEC	0x08
 		#define FL_ONESHOT	0x10
+		#define FL_SCHEDULE	0x20
 	double starttime;
 	/* memory to decide throttling delay
 	 * based on fibonacci numbers
@@ -1035,6 +1037,7 @@ int main(int argc, char *argv[])
 	struct pollfd fset[] = {
 		{ .events = POLLIN, },
 		{ .events = POLLIN, },
+		{ .events = POLLIN, },
 	};
 	sigset_t set;
 	struct sockaddr_un name = {
@@ -1106,6 +1109,18 @@ int main(int argc, char *argv[])
 		goto emergency;
 	}
 
+	/* monitor clock changes */
+	fset[2].fd = ret = libtimechange_makefd();
+	if (ret < 0) {
+		mylog(LOG_ERR, "timerfd for walltime failed: %s", ESTR(errno));
+		goto emergency;
+	}
+	ret = libtimechange_arm(fset[2].fd);
+	if (ret < 0) {
+		mylog(LOG_ERR, "arm walltime timer failed: %s", ESTR(errno));
+		goto emergency;
+	}
+
 	/* launch system start */
 	if (getpid() != 1)
 		rcpid = 0;
@@ -1125,7 +1140,7 @@ int main(int argc, char *argv[])
 	while (1) {
 		libt_flush();
 
-		ret = poll(fset, 2, libt_get_waittime());
+		ret = poll(fset, 3, libt_get_waittime());
 		if (ret < 0)
 			mylog(LOG_CRIT, "poll: %s", ESTR(errno));
 
@@ -1279,6 +1294,25 @@ sock_reply:
 						peername.sun_path+1, ESTR(errno));
 sock_done:
 			; /* empty statement */
+		}
+		if (fset[2].revents) {
+			int n = 0;
+
+			for (svc = svcs; svc; svc = svc->next) {
+				if (!svc->pid && (svc->flags & FL_INTERVAL) &&
+					!isnan(svc->toffset)) {
+					double delay;
+
+					delay = libt_timetointerval4(libt_walltime(), svc->interval, svc->toffset, 1);
+					/* reschedule */
+					libt_add_timeout(delay, exec_svc, svc);
+					++n;
+				}
+			}
+			mylog(LOG_NOTICE, "walltime changed, %i rescheduled", n);
+			ret = libtimechange_arm(fset[2].fd);
+			if (ret < 0)
+				mylog(LOG_ERR, "arm walltime timer failed: %s", ESTR(errno));
 		}
 	}
 	/* not reachable */
