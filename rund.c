@@ -22,6 +22,7 @@
 #include <linux/watchdog.h>
 
 #include "lib/libt.h"
+#include "lib/libtimechange.h"
 
 #define NAME "rund"
 
@@ -259,6 +260,7 @@ struct service {
 		#define FL_PAUSED	0x04
 		#define FL_KILLSPEC	0x08
 		#define FL_ONESHOT	0x10
+		#define FL_SCHEDULE	0x20
 	double starttime;
 	/* memory to decide throttling delay
 	 * based on fibonacci numbers
@@ -273,8 +275,9 @@ struct service {
 	char **argv;
 	char *name;
 	int uid;
-	double interval;
+	double interval, toffset;
 	/* end-of-life state */
+	int killhup;
 	int killgrpdelay, killharddelay;
 
 	/* message to log on next start */
@@ -446,7 +449,11 @@ static int cmd_add(int argc, char *argv[], int cookie)
 			}
 			continue;
 		} else if (!svc->argv && !strncmp("INTERVAL=", argv[j], 9)) {
-			svc->interval = strtod(argv[j]+9, NULL);
+			svc->interval = strtod(argv[j]+9, &endp);
+			if (*endp == ',')
+				svc->toffset = strtod(endp+1, NULL);
+			else
+				svc->toffset = NAN;
 			svc->flags |= FL_INTERVAL;
 			continue;
 		} else if (!svc->argv && !strncmp("DELAY=", argv[j], 6)) {
@@ -481,7 +488,14 @@ static int cmd_add(int argc, char *argv[], int cookie)
 			svc->flags |= FL_PAUSED;
 			continue;
 		} else if (!strncmp("KILL=", argv[j], 5)) {
-			svc->killgrpdelay = strtoul(argv[j]+5, &endp, 0);
+			int consumed = 5;
+			if (!strcasecmp(&argv[j][consumed], "HUP")) {
+				svc->killhup = 1;
+				consumed += 3;
+				if (argv[j][consumed] == ',')
+					++consumed;
+			}
+			svc->killgrpdelay = strtoul(argv[j]+consumed, &endp, 0);
 			if (*endp == ',')
 				svc->killharddelay = strtoul(endp+1, NULL, 0);
 			svc->flags |= FL_KILLSPEC;
@@ -875,14 +889,22 @@ static int cmd_status(int argc, char *argv[], int cookie)
 			bufp += sprintf(bufp, "PID=%u", svc->pid) +1;
 		if (svc->uid)
 			bufp += sprintf(bufp, "USER=#%u", svc->uid) +1;
-		if (svc->flags & FL_INTERVAL)
-			bufp += sprintf(bufp, "INTERVAL=%lf", svc->interval) +1;
+		if (svc->flags & FL_INTERVAL) {
+			bufp += sprintf(bufp, "INTERVAL=%lf", svc->interval);
+			if (!isnan(svc->toffset))
+				bufp += sprintf(bufp, ",%lf", svc->toffset);
+			bufp += 1;
+		}
 		if (svc->flags & FL_REMOVE)
 			bufp += sprintf(bufp, "REMOVING=1") +1;
 		if (svc->flags & FL_PAUSED)
 			bufp += sprintf(bufp, "PAUSED=1") +1;
 		if (svc->flags & FL_KILLSPEC) {
 			bufp += sprintf(bufp, "KILL=");
+			if (svc->killhup)
+				bufp += sprintf(bufp, "HUP");
+			if (svc->killhup && (svc->killgrpdelay || svc->killharddelay))
+				*bufp++ = ',';
 			if (svc->killgrpdelay)
 				bufp += sprintf(bufp, "%i", svc->killgrpdelay);
 			if (svc->killharddelay)
@@ -1027,6 +1049,7 @@ int main(int argc, char *argv[])
 	struct pollfd fset[] = {
 		{ .events = POLLIN, },
 		{ .events = POLLIN, },
+		{ .events = POLLIN, },
 	};
 	sigset_t set;
 	struct sockaddr_un name = {
@@ -1098,6 +1121,18 @@ int main(int argc, char *argv[])
 		goto emergency;
 	}
 
+	/* monitor clock changes */
+	fset[2].fd = ret = libtimechange_makefd();
+	if (ret < 0) {
+		mylog(LOG_ERR, "timerfd for walltime failed: %s", ESTR(errno));
+		goto emergency;
+	}
+	ret = libtimechange_arm(fset[2].fd);
+	if (ret < 0) {
+		mylog(LOG_ERR, "arm walltime timer failed: %s", ESTR(errno));
+		goto emergency;
+	}
+
 	/* launch system start */
 	if (getpid() != 1)
 		rcpid = 0;
@@ -1117,7 +1152,7 @@ int main(int argc, char *argv[])
 	while (1) {
 		libt_flush();
 
-		ret = poll(fset, 2, libt_get_waittime());
+		ret = poll(fset, 3, libt_get_waittime());
 		if (ret < 0)
 			mylog(LOG_CRIT, "poll: %s", ESTR(errno));
 
@@ -1160,8 +1195,14 @@ int main(int argc, char *argv[])
 						; /* do nothing */
 
 					} else if (svc->flags & FL_INTERVAL) {
+						double delay;
+
+						delay = svc->interval;
 						svc->startmsg = "wakeup";
-						libt_add_timeout(svc->interval, exec_svc, svc);
+						if (!isnan(svc->toffset))
+							/* use localtime-synchronised delay */
+							delay = libt_timetointerval4(libt_walltime(), svc->interval, svc->toffset, 1);
+						libt_add_timeout(delay, exec_svc, svc);
 					} else {
 						double delay = svc_throttle_time(svc, libt_now() - svc->starttime);
 
@@ -1265,6 +1306,25 @@ sock_reply:
 						peername.sun_path+1, ESTR(errno));
 sock_done:
 			; /* empty statement */
+		}
+		if (fset[2].revents) {
+			int n = 0;
+
+			for (svc = svcs; svc; svc = svc->next) {
+				if (!svc->pid && (svc->flags & FL_INTERVAL) &&
+					!isnan(svc->toffset)) {
+					double delay;
+
+					delay = libt_timetointerval4(libt_walltime(), svc->interval, svc->toffset, 1);
+					/* reschedule */
+					libt_add_timeout(delay, exec_svc, svc);
+					++n;
+				}
+			}
+			mylog(LOG_NOTICE, "walltime changed, %i rescheduled", n);
+			ret = libtimechange_arm(fset[2].fd);
+			if (ret < 0)
+				mylog(LOG_ERR, "arm walltime timer failed: %s", ESTR(errno));
 		}
 	}
 	/* not reachable */

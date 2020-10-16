@@ -43,6 +43,16 @@ extern void libe_flush(void);
  */
 extern void libe_cleanup(void);
 
+/* more precise control: RD & WR */
+#define LIBE_RD	1
+#define LIBE_WR	2
+
+/* set fd to wait for RD and/or WR */
+extern int libe_mod_fd(int fd, int mask);
+
+/* retrieve RD/WR event mask */
+extern int libe_fd_evs(int fd);
+
 #ifdef __cplusplus
 }
 #endif

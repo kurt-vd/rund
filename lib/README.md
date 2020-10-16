@@ -78,4 +78,14 @@ Retrieve the time (in milliseconds!) from now to the first timeout.
 
 Some other API calls exist, you can inspect them in the sources.
 
+## netrc API
+
+The netrc API is to find a username and/or password for a given
+host or host+username.
+
+	int lib_netrc(const char *host, char **user, char **pwd)
+
+The lookup is done in `~/.netrc`.
+Please refer to `curl` man page for more detailed info on `~/.netrc`
+
 Enjoy!

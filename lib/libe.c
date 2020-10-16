@@ -30,6 +30,7 @@ struct event {
 	void (*fn)(int fd, void *dat);
 	void *dat;
 	int fd;
+	int emask; /* set of LIBE_RD, LIBE_WR */
 };
 
 static struct {
@@ -38,9 +39,33 @@ static struct {
 	int nevs;
 	#define NEVS	16
 	struct epoll_event evs[NEVS];
+	struct epoll_event *currep;
 } s = {
 	.epfd = -1,
 };
+
+/* conversions */
+static int ltoe_mask(int mask)
+{
+	int result = 0;
+
+	if (mask & LIBE_RD)
+		result |= EPOLLIN;
+	if (mask & LIBE_WR)
+		result |= EPOLLOUT;
+	return result;
+}
+
+static int etol_mask(int mask)
+{
+	int result = 0;
+
+	if (mask & (EPOLLIN | EPOLLRDHUP | EPOLLPRI | EPOLLHUP | EPOLLERR))
+		result |= LIBE_RD;
+	if (mask & EPOLLOUT)
+		result |= LIBE_WR;
+	return result;
+}
 
 /* double-linked-list black magic:
  * The @prev member of the first element points to a 'fake' element
@@ -93,15 +118,42 @@ int libe_add_fd(int fd, void (*fn)(int fd, void *), const void *dat)
 	t->fd = fd;
 	t->fn = fn;
 	t->dat = (void *)dat;
+	t->emask = LIBE_RD;
 
 	t_add(t, &s.events);
 	if (s.epfd >= 0) {
 		struct epoll_event evdat = {
-			.events = EPOLLIN,
+			.events = EPOLLIN, /* this matches emask at this point */
 			.data.ptr = t,
 		};
 
 		return epoll_ctl(s.epfd, EPOLL_CTL_ADD, fd, &evdat);
+	}
+	return 0;
+}
+
+int libe_mod_fd(int fd, int mask)
+{
+	struct event *t;
+
+	for (t = s.events; t; t = t->next) {
+		if (t->fd == fd)
+			break;
+	}
+
+	if (!t)
+		return -1;
+	if (t->emask == mask)
+		return 0;
+	t->emask = mask;
+
+	if (s.epfd >= 0) {
+		struct epoll_event evdat = {
+			.data.ptr = t,
+		};
+
+		evdat.events = ltoe_mask(t->emask);
+		return epoll_ctl(s.epfd, EPOLL_CTL_MOD, fd, &evdat);
 	}
 	return 0;
 }
@@ -137,15 +189,14 @@ int libe_wait(int waitmsec)
 
 	if (s.epfd < 0) {
 		/* start EPOLL */
-		struct epoll_event evdat = {
-			.events = EPOLLIN,
-		};
+		struct epoll_event evdat;
 
 		ret = s.epfd = epoll_create(NEVS);
 		if (ret < 0)
 			return ret;
 		for (t = s.events; t; t = t->next) {
 			evdat.data.ptr = t;
+			evdat.events = ltoe_mask(t->emask);
 			ret = epoll_ctl(s.epfd, EPOLL_CTL_ADD, t->fd, &evdat);
 			if (ret < 0) {
 				close(s.epfd);
@@ -169,10 +220,24 @@ void libe_flush(void)
 		if (!s.evs[j].data.ptr)
 			// cleared by evt_remove
 			continue;
+		s.currep = s.evs+j;
 		t = s.evs[j].data.ptr;
 		t->fn(t->fd, t->dat);
 	}
+	s.currep = NULL;
 	s.nevs = 0;
+}
+
+int libe_fd_evs(int fd)
+{
+	struct event *t;
+
+	if (s.currep) {
+		t = s.currep->data.ptr;
+		if (fd == t->fd)
+			return etol_mask(s.currep->events);
+	}
+	return 0;
 }
 
 /* cleanup storage */
