@@ -273,7 +273,7 @@ struct service {
 	char **argv;
 	char *name;
 	int uid;
-	double interval;
+	double interval, toffset;
 	/* end-of-life state */
 	int killgrpdelay, killharddelay;
 
@@ -446,7 +446,11 @@ static int cmd_add(int argc, char *argv[], int cookie)
 			}
 			continue;
 		} else if (!svc->argv && !strncmp("INTERVAL=", argv[j], 9)) {
-			svc->interval = strtod(argv[j]+9, NULL);
+			svc->interval = strtod(argv[j]+9, &endp);
+			if (*endp == ',')
+				svc->toffset = strtod(endp+1, NULL);
+			else
+				svc->toffset = NAN;
 			svc->flags |= FL_INTERVAL;
 			continue;
 		} else if (!svc->argv && !strncmp("DELAY=", argv[j], 6)) {
@@ -875,8 +879,12 @@ static int cmd_status(int argc, char *argv[], int cookie)
 			bufp += sprintf(bufp, "PID=%u", svc->pid) +1;
 		if (svc->uid)
 			bufp += sprintf(bufp, "USER=#%u", svc->uid) +1;
-		if (svc->flags & FL_INTERVAL)
-			bufp += sprintf(bufp, "INTERVAL=%lf", svc->interval) +1;
+		if (svc->flags & FL_INTERVAL) {
+			bufp += sprintf(bufp, "INTERVAL=%lf", svc->interval);
+			if (!isnan(svc->toffset))
+				bufp += sprintf(bufp, ",%lf", svc->toffset);
+			bufp += 1;
+		}
 		if (svc->flags & FL_REMOVE)
 			bufp += sprintf(bufp, "REMOVING=1") +1;
 		if (svc->flags & FL_PAUSED)
@@ -1160,8 +1168,14 @@ int main(int argc, char *argv[])
 						; /* do nothing */
 
 					} else if (svc->flags & FL_INTERVAL) {
+						double delay;
+
+						delay = svc->interval;
 						svc->startmsg = "wakeup";
-						libt_add_timeout(svc->interval, exec_svc, svc);
+						if (!isnan(svc->toffset))
+							/* use localtime-synchronised delay */
+							delay = libt_timetointerval4(libt_walltime(), svc->interval, svc->toffset, 1);
+						libt_add_timeout(delay, exec_svc, svc);
 					} else {
 						double delay = svc_throttle_time(svc, libt_now() - svc->starttime);
 
