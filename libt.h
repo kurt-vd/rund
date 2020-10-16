@@ -74,9 +74,17 @@ extern double libt_walltime(void);
  * offset is the offset to the interval,
  * set -5 to wakeup 5sec before interval,
  * or +5 to wakeup 5sec after interval
+ *
+ * walltime is the reference walltime, normally current time
+ * if the result would be less than timespan, then return
+ * the time to the subsequent interval, i.e. skip 1
  */
-extern double libt_timetointerval2(double interval, double offset);
+extern double libt_timetointerval4(double walltime, double interval, double offset, double pad);
 
+static inline double libt_timetointerval2(double interval, double offset)
+{
+	return libt_timetointerval4(libt_walltime(), interval, offset, interval*0.05);
+}
 static inline double libt_timetointerval(double interval)
 {
 	return libt_timetointerval2(interval, 0);

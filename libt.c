@@ -273,13 +273,32 @@ double libt_walltime(void)
 }
 
 /* try to synchronise timeslices with walltime */
-double libt_timetointerval2(double interval, double offset)
+double libt_timetointerval4(double walltime, double interval, double offset, double pad)
 {
 	double value;
 
-	value = interval - fmod(libt_walltime() - offset, interval);
+	/* TODO: can we skip this test? */
+	if (interval >= 3600*1.5) {
+		long gmtoff;
+		time_t lwalltime, newtime;
+		struct tm *tm;
 
-	if (value < interval*0.05)
-		value += interval;
+		lwalltime = walltime;
+		gmtoff = localtime(&lwalltime)->tm_gmtoff;
+		value = interval - fmod(walltime + gmtoff - offset, interval);
+		/* verify target time */
+		newtime = walltime + value;
+		tm = localtime(&newtime);
+		if (tm->tm_gmtoff != gmtoff)
+			/* timezone daylight saving difference, add the difference */
+			value = value + gmtoff - tm->tm_gmtoff;
+	} else {
+		/* simple case, not localtime stuff */
+		value = interval - fmod(walltime - offset, interval);
+	}
+
+	if (value < pad)
+		/* skip 1 */
+		value = value + pad + libt_timetointerval4(walltime + value + pad, interval, offset, pad);
 	return value;
 }
