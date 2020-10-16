@@ -277,6 +277,7 @@ struct service {
 	int uid;
 	double interval, toffset;
 	/* end-of-life state */
+	int killhup;
 	int killgrpdelay, killharddelay;
 
 	/* message to log on next start */
@@ -487,7 +488,14 @@ static int cmd_add(int argc, char *argv[], int cookie)
 			svc->flags |= FL_PAUSED;
 			continue;
 		} else if (!strncmp("KILL=", argv[j], 5)) {
-			svc->killgrpdelay = strtoul(argv[j]+5, &endp, 0);
+			int consumed = 5;
+			if (!strcasecmp(&argv[j][consumed], "HUP")) {
+				svc->killhup = 1;
+				consumed += 3;
+				if (argv[j][consumed] == ',')
+					++consumed;
+			}
+			svc->killgrpdelay = strtoul(argv[j]+consumed, &endp, 0);
 			if (*endp == ',')
 				svc->killharddelay = strtoul(endp+1, NULL, 0);
 			svc->flags |= FL_KILLSPEC;
@@ -893,6 +901,10 @@ static int cmd_status(int argc, char *argv[], int cookie)
 			bufp += sprintf(bufp, "PAUSED=1") +1;
 		if (svc->flags & FL_KILLSPEC) {
 			bufp += sprintf(bufp, "KILL=");
+			if (svc->killhup)
+				bufp += sprintf(bufp, "HUP");
+			if (svc->killhup && (svc->killgrpdelay || svc->killharddelay))
+				*bufp++ = ',';
 			if (svc->killgrpdelay)
 				bufp += sprintf(bufp, "%i", svc->killgrpdelay);
 			if (svc->killharddelay)
