@@ -327,7 +327,6 @@ static void exec_svc(void *dat)
 		set_nullin();
 	if (svc->startmsg)
 		mylog(LOG_INFO, "%s '%s'", svc->startmsg, svc->name);
-	svc->startmsg = NULL;
 
 	ret = fork();
 	if (ret < 0) {
@@ -342,6 +341,9 @@ static void exec_svc(void *dat)
 		setsid();
 		for (j = 0; j < svc->argv-svc->args; ++j)
 			putenv(svc->args[j]);
+
+		/* insert our start reason to the service */
+		setenv("RUND_INFO", svc->startmsg ?: "", 1);
 
 		/* child */
 		/* redirect stdout & stderr to /dev/null
@@ -378,6 +380,7 @@ static void exec_svc(void *dat)
 		mylog(LOG_CRIT, "execvp %s: %s", svc->name, ESTR(errno));
 		_exit(EXIT_FAILURE);
 	}
+	svc->startmsg = NULL;
 }
 
 static struct service *svc_exists(struct service *dut)
@@ -538,6 +541,7 @@ static int cmd_add(int argc, char *argv[], int cookie)
 	} else {
 		mylog(LOG_INFO, "add '%s'", svc->name);
 		/* exec now */
+		svc->startmsg = "start";
 		exec_svc(svc);
 	}
 	return svc->pid;
