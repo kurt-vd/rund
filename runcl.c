@@ -73,6 +73,7 @@ static const char help_msg[] =
 	"	Remove all services\n"
 	" reload|manual [KEY=VALUE ...] [PRORAM] [ARGUMENT ...]\n"
 	"	Retries a throttled service once\n"
+	"	For services with INTERVAL, trigger once out-of-schedule\n"
 	" stop|pause|suspend [KEY=VALUE ...] [PRORAM] [ARGUMENT ...]\n"
 	"	Stops a service, but do not forget about it\n"
 	" start|resume [KEY=VALUE ...] [PRORAM] [ARGUMENT ...]\n"

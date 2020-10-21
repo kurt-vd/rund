@@ -260,6 +260,7 @@ struct service {
 		#define FL_PAUSED	(1 << 2)
 		#define FL_KILLSPEC	(1 << 3)
 		#define FL_ONESHOT	(1 << 4)
+		#define FL_MANUAL_REQ	(1 << 30)
 	double starttime;
 	/* memory to decide throttling delay
 	 * based on fibonacci numbers
@@ -704,11 +705,19 @@ static int cmd_reload(int argc, char *argv[], int cookie)
 			err = EPERM;
 			continue;
 		}
-		if (!svc->pid && !(svc->flags & FL_PAUSED)) {
+		if (svc->flags & FL_PAUSED)
+			/* ignore paused svc */
+			continue;
+
+		if (!svc->pid) {
 			/* re-schedule immediate */
 			libt_remove_timeout(exec_svc, svc);
 			svc->startmsg = "manual";
 			libt_add_timeout(0, exec_svc, svc);
+			++ndone;
+
+		} else if (svc->flags & FL_INTERVAL) {
+			svc->flags |= FL_MANUAL_REQ;
 			++ndone;
 		}
 	}
@@ -1210,11 +1219,16 @@ int main(int argc, char *argv[])
 					} else if (svc->flags & FL_INTERVAL) {
 						double delay;
 
-						delay = svc->interval;
-						svc->startmsg = "wakeup";
-						if (!isnan(svc->toffset))
-							/* use localtime-synchronised delay */
-							delay = libt_timetointerval4(libt_walltime(), svc->interval, svc->toffset, 1);
+						if (svc->flags & FL_MANUAL_REQ) {
+							svc->startmsg = "manual";
+							delay = 0;
+						} else {
+							delay = svc->interval;
+							svc->startmsg = "wakeup";
+							if (!isnan(svc->toffset))
+								/* use localtime-synchronised delay */
+								delay = libt_timetointerval4(libt_walltime(), svc->interval, svc->toffset, 1);
+						}
 						libt_add_timeout(delay, exec_svc, svc);
 					} else {
 						double delay = svc_throttle_time(svc, libt_now() - svc->starttime);
