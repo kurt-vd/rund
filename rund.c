@@ -255,12 +255,11 @@ struct service {
 	struct service *next;
 	pid_t pid;
 	int flags;
-		#define FL_REMOVE	0x01
-		#define FL_INTERVAL	0x02
-		#define FL_PAUSED	0x04
-		#define FL_KILLSPEC	0x08
-		#define FL_ONESHOT	0x10
-		#define FL_SCHEDULE	0x20
+		#define FL_REMOVE	(1 << 0)
+		#define FL_INTERVAL	(1 << 1)
+		#define FL_PAUSED	(1 << 2)
+		#define FL_KILLSPEC	(1 << 3)
+		#define FL_ONESHOT	(1 << 4)
 	double starttime;
 	/* memory to decide throttling delay
 	 * based on fibonacci numbers
