@@ -1134,12 +1134,20 @@ int main(int argc, char *argv[])
 	}
 
 	/* launch system start */
-	if (getpid() != 1)
+	int mypid = getpid();
+	if ((mypid != 1) && (argc <= 2)) {
 		rcpid = 0;
-	else if ((rcpid = fork()) == 0) {
+	} else if ((rcpid = fork()) == 0) {
 		sigprocmask(SIG_SETMASK, &savedset, NULL);
-		execvp(INIT, argv);
-		mylog(LOG_CRIT, "execvp %s: %s", ESTR(errno), INIT);
+		if (mypid == 1)
+			argv[0] = INIT;
+		else {
+			name.sun_path[0] = '@';
+			setenv("RUND_SOCK", name.sun_path, 1);
+			argv += 2;
+		}
+		execvp(*argv, argv);
+		mylog(LOG_CRIT, "execvp %s: %s", ESTR(errno), *argv);
 	} else if (rcpid < 0)
 		mylog(LOG_CRIT, "fork: %s", ESTR(errno));
 
