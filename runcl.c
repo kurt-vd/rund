@@ -71,7 +71,7 @@ static const char help_msg[] =
 	"	Remove a service\n"
 	" remove *\n"
 	"	Remove all services\n"
-	" reload [KEY=VALUE ...] [PRORAM] [ARGUMENT ...]\n"
+	" reload|manual [KEY=VALUE ...] [PRORAM] [ARGUMENT ...]\n"
 	"	Retries a throttled service once\n"
 	" stop|pause|suspend [KEY=VALUE ...] [PRORAM] [ARGUMENT ...]\n"
 	"	Stops a service, but do not forget about it\n"

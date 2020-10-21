@@ -707,6 +707,7 @@ static int cmd_reload(int argc, char *argv[], int cookie)
 		if (!svc->pid && !(svc->flags & FL_PAUSED)) {
 			/* re-schedule immediate */
 			libt_remove_timeout(exec_svc, svc);
+			svc->startmsg = "manual";
 			libt_add_timeout(0, exec_svc, svc);
 			++ndone;
 		}
@@ -988,6 +989,7 @@ struct cmd {
 	{ "add", cmd_add, },
 	{ "remove", cmd_remove, },
 	{ "reload", cmd_reload, },
+	{ "manual", cmd_reload, },
 	{ "pause", cmd_pause, COOKIE_PAUSE, },
 	{ "suspend", cmd_pause, COOKIE_PAUSE, },
 	{ "resume", cmd_pause, COOKIE_RESUME, },
