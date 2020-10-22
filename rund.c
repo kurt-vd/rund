@@ -260,6 +260,7 @@ struct service {
 		#define FL_PAUSED	(1 << 2)
 		#define FL_KILLSPEC	(1 << 3)
 		#define FL_ONESHOT	(1 << 4)
+		#define FL_LAZY_INTERVAL	(1 << 5)
 		#define FL_MANUAL_REQ	(1 << 30)
 	double starttime;
 	/* memory to decide throttling delay
@@ -412,6 +413,7 @@ static int cmd_add(int argc, char *argv[], int cookie)
 	struct service *svc, *svc2;
 	int j, f, result = 0;
 	char *endp;
+	char *tok;
 	double delay = 0;
 
 	if (myuid && peeruid && (myuid != peeruid))
@@ -452,11 +454,12 @@ static int cmd_add(int argc, char *argv[], int cookie)
 			}
 			continue;
 		} else if (!svc->argv && !strncmp("INTERVAL=", argv[j], 9)) {
-			svc->interval = strtod(argv[j]+9, &endp);
-			if (*endp == ',')
-				svc->toffset = strtod(endp+1, NULL);
-			else
-				svc->toffset = NAN;
+			svc->interval = strtod(strtok(argv[j]+9, ",;") ?: "0", NULL);
+			svc->toffset = strtod(strtok(NULL, ",;") ?: "nan", NULL);
+			for (tok = strtok(NULL, ",;"); tok; tok = strtok(NULL, ",;")) {
+				if (!strcmp(tok, "lazy"))
+					svc->flags |= FL_LAZY_INTERVAL;
+			}
 			svc->flags |= FL_INTERVAL;
 			continue;
 		} else if (!svc->argv && !strncmp("DELAY=", argv[j], 6)) {
@@ -906,6 +909,8 @@ static int cmd_status(int argc, char *argv[], int cookie)
 			bufp += sprintf(bufp, "INTERVAL=%lf", svc->interval);
 			if (!isnan(svc->toffset))
 				bufp += sprintf(bufp, ",%lf", svc->toffset);
+			if (svc->flags & FL_LAZY_INTERVAL)
+				bufp += sprintf(bufp, ",lazy");
 			bufp += 1;
 		}
 		if (svc->flags & FL_REMOVE)
@@ -1222,14 +1227,19 @@ int main(int argc, char *argv[])
 						delay = svc->interval;
 						svc->startmsg = "wakeup";
 						if (!isnan(svc->toffset)) {
-							double mono = libt_now();
+							double strict_offset;
 							double wall = libt_walltime();
+
+							if (svc->flags & FL_LAZY_INTERVAL)
+								strict_offset = 0;
+							else
+								strict_offset = libt_now() - svc->starttime;
 
 							/* use localtime-synchronised delay
 							 * schedule next since previous start
 							 */
-							delay = libt_timetointerval4(wall - (mono - svc->starttime), svc->interval, svc->toffset, 1);
-							delay -= mono - svc->starttime;
+							delay = libt_timetointerval4(wall - strict_offset, svc->interval, svc->toffset, 1);
+							delay -= strict_offset;
 						}
 						if ((delay > 1) && (svc->flags & FL_MANUAL_REQ)) {
 							svc->startmsg = "manual";
