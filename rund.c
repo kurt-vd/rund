@@ -1219,16 +1219,23 @@ int main(int argc, char *argv[])
 					} else if (svc->flags & FL_INTERVAL) {
 						double delay;
 
-						if (svc->flags & FL_MANUAL_REQ) {
+						delay = svc->interval;
+						svc->startmsg = "wakeup";
+						if (!isnan(svc->toffset)) {
+							double mono = libt_now();
+							double wall = libt_walltime();
+
+							/* use localtime-synchronised delay
+							 * schedule next since previous start
+							 */
+							delay = libt_timetointerval4(wall - (mono - svc->starttime), svc->interval, svc->toffset, 1);
+							delay -= mono - svc->starttime;
+						}
+						if ((delay > 1) && (svc->flags & FL_MANUAL_REQ)) {
 							svc->startmsg = "manual";
 							delay = 0;
-						} else {
-							delay = svc->interval;
-							svc->startmsg = "wakeup";
-							if (!isnan(svc->toffset))
-								/* use localtime-synchronised delay */
-								delay = libt_timetointerval4(libt_walltime(), svc->interval, svc->toffset, 1);
 						}
+						svc->flags &= ~FL_MANUAL_REQ;
 						libt_add_timeout(delay, exec_svc, svc);
 					} else {
 						double delay = svc_throttle_time(svc, libt_now() - svc->starttime);
