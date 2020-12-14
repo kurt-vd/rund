@@ -36,6 +36,7 @@ static const char help_msg[] =
 	"\n"
 	"Options:\n"
 	" -V	Show version\n"
+	" -pPID	Apply changes to PID\n"
 	"Settings:\n"
 	" cd:DIR		chdir\n"
 	" umask:0XX		change umask\n"
@@ -168,8 +169,9 @@ char *estrtok(char *haystack, const char *needle)
 /* main process */
 int main(int argc, char *argv[])
 {
-	int opt;
+	int opt, ret;
 	char *tok, *str;
+	int pid = 0;
 
 	for (++argv; *argv; ++argv) {
 		/* test for program options */
@@ -178,6 +180,12 @@ int main(int argc, char *argv[])
 			case 'V':
 				fprintf(stderr, "%s: %s\n", NAME, VERSION);
 				return 0;
+			case 'p':
+				if ((*argv)[2])
+					pid = strtol(&(*argv)[2], NULL, 0);
+				else
+					pid = strtol(*(++argv), NULL, 0);
+				break;
 			default:
 			case '?':
 				fputs(help_msg, stderr);
@@ -193,6 +201,8 @@ int main(int argc, char *argv[])
 		/* test for environment variables */
 		str = strchr(*argv, '=');
 		if (str) {
+			if (pid)
+				mylog(LOG_ERR, "changing environment not supported on PID");
 			*str++ = 0;
 			setenv(*argv, str, 1);
 			continue;
@@ -212,6 +222,8 @@ int main(int argc, char *argv[])
 			break;
 		}
 		else if (!strcmp(tok, "cd")) {
+			if (pid)
+				mylog(LOG_ERR, "%s: not supported on PID", tok);
 			tok = estrtok(NULL, "") ?: "";
 
 			if (chdir(tok) < 0)
@@ -239,7 +251,7 @@ int main(int argc, char *argv[])
 						CPU_SET(c1, &cs);
 			}
 
-			if (sched_setaffinity(0, sizeof(cs), &cs) < 0)
+			if (sched_setaffinity(pid, sizeof(cs), &cs) < 0)
 				mylog(LOG_ERR, "sched_setaffinity: %s", ESTR(errno));
 		}
 		else if (!strcmp(tok, "ionice")) {
@@ -261,7 +273,7 @@ int main(int argc, char *argv[])
 			int val = strtol(estrtok(NULL, ",") ?: "0", NULL, 0);
 
 			/* commit value */
-			if (ioprio_set(IOPRIO_WHO_PROCESS, 0, IOPRIO_PRIO_VALUE(opt, val)) < 0)
+			if (ioprio_set(IOPRIO_WHO_PROCESS, pid, IOPRIO_PRIO_VALUE(opt, val)) < 0)
 				mylog(LOG_ERR, "ioprio_set %s,%i: %s", ioprios[opt] ?: "", val, ESTR(errno));
 		}
 		else if (!strcmp(tok, "lim")) {
@@ -287,13 +299,17 @@ int main(int argc, char *argv[])
 				/* increase max too */
 				limit.rlim_max = limit.rlim_cur;
 
-			if (setrlimit(opt, &limit) < 0)
+			if (pid)
+				ret = prlimit(pid, opt, &limit, NULL);
+			else
+				ret = setrlimit(opt, &limit);
+			if (ret < 0)
 				mylog(LOG_ERR, "rlimit %s %lu %lu: %s", resnames[opt],
 						(long)limit.rlim_cur, (long)limit.rlim_max, ESTR(errno));
 		}
 		else if (!strcmp(tok, "nice")) {
 			opt = strtol(estrtok(NULL, "") ?: "0", NULL, 0);
-			if (setpriority(PRIO_PROCESS, 0, opt) < 0)
+			if (setpriority(PRIO_PROCESS, pid, opt) < 0)
 				mylog(LOG_ERR, "nice %i: %s", opt, ESTR(errno));
 		}
 		else if (!strcmp(tok, "sched")) {
@@ -325,10 +341,12 @@ int main(int argc, char *argv[])
 				break;
 			}
 
-			if (sched_setattr(0, &sa, 0) < 0)
+			if (sched_setattr(pid, &sa, 0) < 0)
 				mylog(LOG_ERR, "sched_setattr %i failed: %s", sa.sched_policy, ESTR(errno));
 		}
 		else if (!strcmp(tok, "uid")) {
+			if (pid)
+				mylog(LOG_ERR, "%s: not supported on PID", tok);
 			struct passwd *pw;
 			struct group *gr;
 			gid_t groups[128];
@@ -391,10 +409,12 @@ int main(int argc, char *argv[])
 			}
 			if (uname)
 				free(uname);
-			if(gname);
+			if(gname)
 				free(gname);
 		}
 		else if (!strcmp(tok, "umask")) {
+			if (pid)
+				mylog(LOG_ERR, "%s: not supported on PID", tok);
 			opt = strtoul(estrtok(NULL, "") ?: "0", NULL, 8);
 			umask(opt);
 		}
