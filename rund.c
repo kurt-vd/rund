@@ -30,6 +30,7 @@
 #define STOP "/etc/rc.shutdown"
 #define HELP "/sbin/sulogin"
 
+static int consolevalid;
 /* logging */
 static int syslog_open;
 static int loglevel = LOG_WARNING;
@@ -48,7 +49,7 @@ static void mylog(int level, const char *fmt, ...)
 		; /* nothing to print */
 	else if (syslog_open)
 		syslog(level, "%s", buf);
-	else if (level <= loglevel)
+	else if (consolevalid && level <= loglevel)
 		dprintf(STDERR_FILENO, "%s: %s\n", NAME, buf);
 	if (level < LOG_ERR)
 		exit(EXIT_FAILURE);
@@ -74,18 +75,18 @@ static sigset_t savedset;
  * You can mount /dev and create it later,
  * just before the first service starts.
  */
-static int nullin; /* stdin is already /dev/null */
-static void set_nullin(void)
+static int nullfd = -1;
+static void set_nullfd(void)
 {
-	int fd;
-
-	fd = open("/dev/null", O_RDWR);
-	if (fd < 0)
+	if (nullfd >= 0)
+		return;
+	nullfd = open("/dev/null", O_RDWR);
+	if (nullfd < 0)
 		mylog(LOG_WARNING, "open %s: %s", "/dev/null", ESTR(errno));
-	else {
-		dup2(fd, STDIN_FILENO);
-		close(fd);
-		nullin = 1;
+	else if (consolevalid) {
+		dup2(nullfd, STDIN_FILENO);
+		close(nullfd);
+		nullfd = STDIN_FILENO;
 	}
 }
 
@@ -325,8 +326,8 @@ static void exec_svc(void *dat)
 	struct service *svc = dat;
 	int ret, j;
 
-	if (!nullin)
-		set_nullin();
+	if (nullfd < 0)
+		set_nullfd();
 	if (svc->startmsg)
 		mylog(LOG_INFO, "%s '%s'", svc->startmsg, svc->name);
 
@@ -355,8 +356,8 @@ static void exec_svc(void *dat)
 		 * Prevent redirect with environment DETACH=0
 		 */
 		if (strcmp(getenv("DETACH") ?: "1", "0")) {
-			dup2(STDIN_FILENO, STDOUT_FILENO);
-			dup2(STDIN_FILENO, STDERR_FILENO);
+			dup2(nullfd, STDOUT_FILENO);
+			dup2(nullfd, STDERR_FILENO);
 		}
 
 		/* only try to set user when I'm root */
@@ -807,6 +808,8 @@ static int cmd_redir(int argc, char *argv[], int cookie)
 
 	if (argc < 2)
 		return -EINVAL;
+	if (!consolevalid)
+		return -ENOTTY;
 	fd = open(argv[1], O_WRONLY | O_NOCTTY | O_APPEND | O_CREAT, 0666);
 	if (fd < 0) {
 		ret = errno;
@@ -1118,6 +1121,11 @@ int main(int argc, char *argv[])
 		goto emergency;
 	}
 	fcntl(ret, F_SETFD, fcntl(ret, F_GETFD) | FD_CLOEXEC);
+
+	/* test if console if valid
+	 * avoid using stdio if not
+	 */
+	consolevalid = fset[0].fd > STDERR_FILENO;
 
 	/* open server socket */
 	fset[1].fd = sock = socket(PF_UNIX, SOCK_DGRAM, 0);
