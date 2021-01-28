@@ -818,11 +818,11 @@ static int cmd_redir(int argc, char *argv[], int cookie)
 	}
 	ret = 0;
 	if (dup2(fd, STDOUT_FILENO) < 0) {
-		ret = errno; /* save errno for later return */
+		ret = -errno; /* save errno for later return */
 		mylog(LOG_WARNING, "dup2 %s stdout: %s", argv[1], ESTR(errno));
 	}
 	if (dup2(fd, STDERR_FILENO) < 0) {
-		ret = errno; /* save errno for later return */
+		ret = -errno; /* save errno for later return */
 		mylog(LOG_WARNING, "dup2 %s stdout: %s", argv[1], ESTR(errno));
 	}
 	close(fd);
