@@ -65,6 +65,8 @@ static int peeruid;
 static int myuid;
 static sigset_t savedset;
 
+static int rcpid;
+
 /* stdin initially is /dev/console
  * I want to redirect it to /dev/null,
  * when I start spawning services.
@@ -1027,6 +1029,26 @@ static int cmd_setkill(int argc, char *argv[], int cookie)
 	return 0;
 }
 
+static int do_shutdown(const char *todo)
+{
+	if (rcpid > 0)
+		/* kill pending rc.init/rc.shutdown */
+		kill(-rcpid, SIGTERM);
+	if (getpid() != 1)
+		exit(0);
+	mylog(LOG_INFO, "%s ...", todo);
+	rcpid = fork();
+	if (rcpid < 0)
+		mylog(LOG_CRIT, "fork: %s", ESTR(errno));
+	else if (!rcpid) {
+		sigprocmask(SIG_SETMASK, &savedset, NULL);
+		execl(STOP, STOP, todo, NULL);
+		mylog(LOG_CRIT, "execl %s %s: %s", ESTR(errno), STOP, todo);
+	}
+	return rcpid;
+
+}
+
 /* remote commands */
 struct cmd {
 	const char *name;
@@ -1098,7 +1120,7 @@ int main(int argc, char *argv[])
 {
 	int ret;
 	struct service *svc;
-	pid_t rcpid, pid;
+	pid_t pid;
 	struct pollfd fset[] = {
 		{ .events = POLLIN, },
 		{ .events = POLLIN, },
@@ -1132,7 +1154,6 @@ int main(int argc, char *argv[])
 	char **args;
 	int nargs;
 	const struct cmd *cmd;
-	char *todo;
 
 	if (getpid() == 1) {
 	} else if ((argc > 1) && (*argv[1] == '@'))
@@ -1224,8 +1245,6 @@ int main(int argc, char *argv[])
 
 		if (fset[0].revents) {
 			/* signals */
-			todo = NULL;
-
 			ret = read(fset[0].fd, &info, sizeof(info));
 			if (ret < 0)
 				/* TODO: test for EAGAIN */
@@ -1299,26 +1318,13 @@ int main(int argc, char *argv[])
 				}
 				break;
 			case SIGUSR1:
-				todo = todo ?: "halt";
+				do_shutdown("halt");
+				break;
 			case SIGINT:
-				todo = todo ?: "reboot";
+				do_shutdown("reboot");
+				break;
 			case SIGTERM:
-				todo = todo ?: "poweroff";
-
-				if (rcpid > 0)
-					/* kill pending rc.init/rc.shutdown */
-					kill(-rcpid, SIGTERM);
-				if (getpid() != 1)
-					exit(0);
-				mylog(LOG_INFO, "%s ...", todo);
-				rcpid = fork();
-				if (rcpid < 0)
-					mylog(LOG_CRIT, "fork: %s", ESTR(errno));
-				else if (!rcpid) {
-					sigprocmask(SIG_SETMASK, &savedset, NULL);
-					execl(STOP, STOP, todo, NULL);
-					mylog(LOG_CRIT, "execl %s %s: %s", ESTR(errno), STOP, todo);
-				}
+				do_shutdown("poweroff");
 				break;
 			case SIGHUP:
 				/* retry throttled services */
