@@ -102,6 +102,7 @@ static const char help_msg[] =
 	"	This solves the case where pid 1 has open files\n"
 	"	that were removed, which keeps the filesystem busy\n"
 	"	for writing\n"
+	" shutdown halt|reboot|poweroff|...\n"
 	;
 static const char optstring[] = "+?VqQr::m:s:";
 

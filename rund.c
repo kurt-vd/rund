@@ -1049,6 +1049,16 @@ static int do_shutdown(const char *todo)
 
 }
 
+static int cmd_shutdown(int argc, char *argv[], int cookie)
+{
+	if (peeruid)
+		return -EPERM;
+	if (argc < 1)
+		return -EINVAL;
+	return do_shutdown(argv[argc-1]);
+
+}
+
 /* remote commands */
 struct cmd {
 	const char *name;
@@ -1075,6 +1085,7 @@ struct cmd {
 	{ "env", cmd_env, },
 	{ "status", cmd_status, },
 	{ "exec", cmd_exec, },
+	{ "shutdown", cmd_shutdown, },
 	{ },
 };
 

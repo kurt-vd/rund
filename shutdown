@@ -13,17 +13,7 @@ ACTION=`basename "$0"`
 case "$INITBIN" in
 rund)
 	# TODO: write utmp
-	case "$ACTION" in
-	*halt)
-		exec kill -USR1 1
-		;;
-	*reboot)
-		exec kill -INT 1
-		;;
-	*poweroff|*shutdown)
-		exec kill -TERM 1
-		;;
-	esac
+	runcl shutdown $ACTION
 	;;
 systemd)
 	/bin/systemctl $ACTION "$@"
