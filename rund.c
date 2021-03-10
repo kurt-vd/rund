@@ -123,6 +123,7 @@ struct wdt {
 	struct wdt *next;
 	int fd;
 	int timeout;
+	int pretimeout;
 	char file[2];
 };
 static struct wdt *wdts;
@@ -132,7 +133,7 @@ static void do_watchdog(void *dat)
 	struct wdt *wdt = dat;
 
 	write(wdt->fd, "keepalive", 9);
-	libt_add_timeout(wdt->timeout/2.0, do_watchdog, wdt);
+	libt_add_timeout((wdt->pretimeout ?: wdt->timeout)*0.75, do_watchdog, wdt);
 }
 
 static int cmd_watchdog(int argc, char *argv[], int cookie)
@@ -199,15 +200,26 @@ static int cmd_watchdog(int argc, char *argv[], int cookie)
 		int timeout = strtoul(argv[3], 0, 0);
 		if (timeout != wdt->timeout) {
 			ret = ioctl(wdt->fd, WDIOC_SETTIMEOUT, &timeout);
-			if (ret < 0) {
+			if (ret < 0 && errno != ENOTSUP) {
 				mylog(LOG_ERR, "ioctl %s settimeout %i: %s", device,
 						timeout, ESTR(errno));
 				return -errno;
 			}
 			wdt->timeout = timeout;
-			do_watchdog(wdt);
 			++result;
 		}
+		timeout = (argc > 4) ? strtoul(argv[4], NULL, 0) : wdt->pretimeout;
+		if (timeout != wdt->pretimeout) {
+			ret = ioctl(wdt->fd, WDIOC_SETPRETIMEOUT, &timeout);
+			if (ret < 0 && errno != ENOTSUP) {
+				mylog(LOG_ERR, "ioctl %s setpretimeout %i: %s", device,
+						timeout, ESTR(errno));
+				return -errno;
+			}
+			wdt->pretimeout = timeout;
+			++result;
+		}
+		do_watchdog(wdt);
 		return result;
 
 	} else if (strcmp(argv[1], "add")) {
@@ -228,6 +240,8 @@ static int cmd_watchdog(int argc, char *argv[], int cookie)
 		free(wdt);
 		return -EINVAL;
 	}
+	wdt->pretimeout = (argc > 4) ? strtoul(argv[4], NULL, 0) : 0;
+
 	wdt->fd = open(device, O_RDWR | O_CLOEXEC);
 	if (wdt->fd < 0) {
 		free(wdt);
@@ -239,10 +253,25 @@ static int cmd_watchdog(int argc, char *argv[], int cookie)
 	if (ret < 0 && errno != ENOTSUP) {
 		mylog(LOG_ERR, "ioctl %s settimeout %i: %s", device,
 				wdt->timeout, ESTR(errno));
+		/* try to close decently */
+		write(wdt->fd, "V", 1);
 		close(wdt->fd);
 		free(wdt);
 		return -errno;
 	}
+	if (wdt->pretimeout) {
+		ret = ioctl(wdt->fd, WDIOC_SETPRETIMEOUT, &wdt->pretimeout);
+		if (ret < 0 && errno != ENOTSUP) {
+			mylog(LOG_ERR, "ioctl %s setpretimeout %i: %s", device,
+					wdt->pretimeout, ESTR(errno));
+			/* try to close decently */
+			write(wdt->fd, "V", 1);
+			close(wdt->fd);
+			free(wdt);
+			return -errno;
+		}
+	}
+
 	/* add in linked list */
 	wdt->next = wdts;
 	wdts = wdt;
@@ -879,6 +908,8 @@ static int cmd_status(int argc, char *argv[], int cookie)
 		strcpy(bufp, wdt->file);
 		bufp += strlen(bufp)+1;
 		bufp += sprintf(bufp, "%i", wdt->timeout) +1;
+		if (wdt->pretimeout)
+			bufp += sprintf(bufp, "%i", wdt->pretimeout) +1;
 		ret = sendto(sock, sbuf, bufp-sbuf, 0, (void *)&peername, peernamelen);
 		if (ret < 0)
 			return -errno;
