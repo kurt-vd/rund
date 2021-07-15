@@ -291,7 +291,7 @@ int main(int argc, char *argv[])
 			if (!quiet && !quietbis)
 				mylog(LOG_INFO, "%s %s after %lu seconds", sbuf,
 					ret ? "aborted" : "finished",
-					time(NULL)-t0);
+					(long)(time(NULL)-t0));
 			return !!ret;
 		}
 		/* remove timeout */

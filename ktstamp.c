@@ -9,6 +9,6 @@ int main(int argc, char *argv[])
 	int secwidth = !strcmp(argv[1]?: "", "-k") ? 5 : 0;
 
 	clock_gettime(CLOCK_MONOTONIC, &ts);
-	printf("%*lu.%06lu\n", secwidth, ts.tv_sec, ts.tv_nsec/1000);
+	printf("%*lu.%06lu\n", secwidth, (long)ts.tv_sec, (long)ts.tv_nsec/1000);
 	return 0;
 }
