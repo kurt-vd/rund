@@ -417,29 +417,6 @@ static void exec_svc(void *dat)
 	svc->startmsg = NULL;
 }
 
-static struct service *svc_exists(struct service *dut)
-{
-	struct service *svc;
-	int j;
-
-	for (svc = svcs; svc; svc = svc->next) {
-		if (svc->uid != dut->uid)
-			continue;
-		if ((svc->flags & FL_REMOVE) ||
-				((svc->flags & FL_ONESHOT) && svc->pid))
-			/* ignore services about to be removed */
-			continue;
-
-		for (j = 0; svc->args[j] && dut->args[j]; ++j) {
-			if (strcmp(svc->args[j], dut->args[j]))
-				break;
-		}
-		if (!svc->args[j] && !dut->args[j])
-			return svc;
-	}
-	return NULL;
-}
-
 static int cmd_add(int argc, char *argv[], int cookie)
 {
 	struct service *svc, *svc2;
@@ -556,9 +533,24 @@ static int cmd_add(int argc, char *argv[], int cookie)
 	svc->args[f] = NULL;
 	if (!svc->argv)
 		svc->argv = svc->args;
-	if (svc_exists(svc)) {
-		result = -EEXIST;
-		goto failed;
+
+	/* test if svc exists already */
+	for (svc2 = svcs; svc2; svc2 = svc2->next) {
+		if (svc2->uid != svc->uid)
+			continue;
+		if ((svc2->flags & FL_REMOVE) ||
+				((svc2->flags & FL_ONESHOT) && svc2->pid))
+			/* ignore services about to be removed */
+			continue;
+
+		for (j = 0; svc2->args[j] && svc->args[j]; ++j) {
+			if (strcmp(svc2->args[j], svc->args[j]))
+				break;
+		}
+		if (!svc2->args[j] && !svc->args[j]) {
+			result = -EEXIST;
+			goto failed;
+		}
 	}
 
 	/* add in linked list */
