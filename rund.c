@@ -293,6 +293,7 @@ struct service {
 		#define FL_KILLSPEC	(1 << 3)
 		#define FL_ONESHOT	(1 << 4)
 		#define FL_LAZY_INTERVAL	(1 << 5)
+		#define FL_ONESHOT_REM	(1 << 29) /* oneshot, remove when finished */
 		#define FL_MANUAL_REQ	(1 << 30)
 	double starttime;
 	/* memory to decide throttling delay
@@ -368,6 +369,8 @@ static void exec_svc(void *dat)
 		/* postpone for 1 second always, no incremental delay */
 		libt_add_timeout(1, exec_svc, svc);
 	} else if (ret > 0) {
+		if (svc->flags & FL_ONESHOT)
+			svc->flags |= FL_ONESHOT_REM;
 		svc->starttime = libt_now();
 		svc->pid = ret;
 	} else {
@@ -538,8 +541,7 @@ static int cmd_add(int argc, char *argv[], int cookie)
 	for (svc2 = svcs; svc2; svc2 = svc2->next) {
 		if (svc2->uid != svc->uid)
 			continue;
-		if ((svc2->flags & FL_REMOVE) ||
-				((svc2->flags & FL_ONESHOT) && svc2->pid))
+		if (svc2->flags & FL_REMOVE)
 			/* ignore services about to be removed */
 			continue;
 
@@ -547,8 +549,17 @@ static int cmd_add(int argc, char *argv[], int cookie)
 			if (strcmp(svc2->args[j], svc->args[j]))
 				break;
 		}
-		if (!svc2->args[j] && !svc->args[j]) {
-			result = -EEXIST;
+		if (!svc2->args[j] && !svc->args[j]
+				&& ((svc2->flags & FL_ONESHOT) == (svc->flags & FL_ONESHOT))
+				&& (svc2->uid == svc->uid)) {
+			if ((svc2->flags & FL_ONESHOT)) {
+				/* duplicate for a ONESHOT service
+				 * make it restart after current one ends */
+				svc2->flags &= ~FL_ONESHOT_REM;
+				/* return ok */
+				result = 0;
+			} else
+				result = -EEXIST;
 			goto failed;
 		}
 	}
@@ -1271,7 +1282,7 @@ int main(int argc, char *argv[])
 					/* found svc */
 					svc->pid = 0;
 
-					if (svc->flags & (FL_REMOVE | FL_ONESHOT)) {
+					if (svc->flags & (FL_REMOVE | FL_ONESHOT_REM)) {
 						if (!(svc->flags & FL_REMOVE))
 							/* notify 'unexpected' end */
 							mylog(LOG_WARNING, "'%s' ended", svc->name);
