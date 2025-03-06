@@ -1176,7 +1176,7 @@ int main(int argc, char *argv[])
 	} else if ((argc > 1) && (*argv[1] == '@'))
 		strcpy(name.sun_path+1, &argv[1][1]);
 	else {
-		printf("%s %s\n", NAME, VERSION);
+		printf("%s %s, built %s %s\n", NAME, VERSION, __DATE__, __TIME__);
 		return 0;
 	}
 	myuid = getuid();
