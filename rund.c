@@ -534,8 +534,11 @@ static int cmd_add(int argc, char *argv[], int cookie)
 		++f;
 	}
 	svc->args[f] = NULL;
-	if (!svc->argv)
-		svc->argv = svc->args;
+	if (!svc->argv) {
+		result = -EINVAL;
+		mylog(LOG_WARNING, "adding service without command, refused");
+		goto failed;
+	}
 
 	/* test if svc exists already */
 	for (svc2 = svcs; svc2; svc2 = svc2->next) {
