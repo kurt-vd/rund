@@ -620,6 +620,7 @@ static struct service *find_svc3(struct service *svcs, char *args[], int accept_
 {
 	struct service *svc;
 	int j, k;
+	char *tok;
 
 	if (!args)
 		return NULL;
@@ -657,6 +658,26 @@ static struct service *find_svc3(struct service *svcs, char *args[], int accept_
 			}
 			if (!strncmp(args[j], "DELAY=", 6)) {
 				/* DELAY=XYZ is not saved, no test possible */
+				continue;
+			}
+			if ((tok = strstr(args[j], "!=")) != NULL) {
+				/* negative match:
+				 * match all services with have not this KEY=VAL
+				 */
+				int keylen = tok - args[j];
+				for (k = 0; svc->args[k]; ++k) {
+					if (   !strncmp(args[j], svc->args[k], keylen)
+					    && svc->args[k][keylen] == '='
+					    && !strcmp(tok+2, &svc->args[k][keylen+1])) {
+						/* this service contains a KEY=VALUE
+						 * and KEY!=VALUE was requested
+						 */
+						goto nomatch;
+					}
+				}
+				/* negative match didn't match here
+				 * consider this argument a match
+				 */
 				continue;
 			}
 			for (k = 0; svc->args[k]; ++k) {
