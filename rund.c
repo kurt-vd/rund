@@ -621,6 +621,7 @@ static struct service *find_svc3(struct service *svcs, char *args[], int accept_
 	struct service *svc;
 	int j, k;
 	char *tok;
+	int want, curr;
 
 	if (!args)
 		return NULL;
@@ -637,7 +638,20 @@ static struct service *find_svc3(struct service *svcs, char *args[], int accept_
 				/* argument may be name */
 				continue;
 			if (!strncmp(args[j], "PID=", 4)) {
-				if (strtoul(args[j]+4, NULL, 0) != svc->pid)
+				if (args[j][4] == '*') {
+					if (svc->pid != 0)
+						/* wildcard matches any non-zero PID */
+						continue;
+					goto nomatch;
+				}
+				want = strtoul(args[j]+4, NULL, 0);
+				if (want != svc->pid)
+					goto nomatch;
+				continue;
+			}
+			if (!strncmp(args[j], "PID!=", 5)) {
+				want = strtoul(args[j]+5, NULL, 0);
+				if (want == svc->pid)
 					goto nomatch;
 				continue;
 			}
@@ -651,8 +665,17 @@ static struct service *find_svc3(struct service *svcs, char *args[], int accept_
 					goto nomatch;
 				continue;
 			}
-			if (!strcmp(args[j], "ONESHOT=1")) {
-				if (!(svc->flags & FL_ONESHOT))
+			if (!strncmp(args[j], "PAUSED=", 7)) {
+				want = strtoul(args[j]+7, NULL, 0);
+				curr = !!(svc->flags & FL_PAUSED);
+				if (want != curr)
+					goto nomatch;
+				continue;
+			}
+			if (!strncmp(args[j], "ONESHOT=", 8)) {
+				want = strtoul(args[j]+8, NULL, 0);
+				curr = !!(svc->flags & FL_ONESHOT);
+				if (want != curr)
 					goto nomatch;
 				continue;
 			}
