@@ -3,22 +3,37 @@
 # example script that shows how to upgrade a running rund
 # without rebooting
 
-function failed
+run()
 {
-	echo "FAIL $@"
-	exit 1
+	echo "$ $@" >&2
+	"$@"
+	local RET=$?
+	if [ "$RET" != 0 ]; then
+		echo "FAIL $RET" >&2
+	fi
+	return $RET
+
+}
+
+must_succeed()
+{
+	if ! run "$@"; then
+		exit 1
+	fi
+	return 0
 }
 
 SVCS=/tmp/$$
 
 # save state
-runcl -q status -ad > "$SVCS" || failed "Save current state"
+must_succeed runcl -q status -ad > "$SVCS"
 
 # exec new version
-runcl -q exec rund -noinit || failed "Exec new rund"
+must_succeed runcl exec rund -noinit
 
+run sleep 1
 # restore state
 while read ARGS; do
-	runcl -q $ARGS || echo "FAILED: $ARGS"
+	run runcl -q $ARGS || echo "FAILED: $ARGS"
 done < "$SVCS"
 exit 0
